@@ -67,42 +67,6 @@ export default class Authentication {
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 
-    public static async forgotUserPassword(req: Request, res: Response) {
-        const { email } = req.body;
-        const serviceResult = await Authentication.service.forgotPassword(email, UserType.USER);
-        res.status(serviceResult.statusCode).json(serviceResult.json);
-    }
-
-    public static async forgotProfessionalPassword(req: Request, res: Response) {
-        const { email } = req.body;
-        const serviceResult = await Authentication.service.forgotPassword(email, UserType.PROFESSIONAL);
-        res.status(serviceResult.statusCode).json(serviceResult.json);
-    }
-
-    public static async verifyUserPasswordResetOTP(req: Request, res: Response) {
-        const { email, otp } = req.body;
-        const serviceResult = await Authentication.service.verifyPasswordResetOTP(email, otp, UserType.USER);
-        res.status(serviceResult.statusCode).json(serviceResult.json);
-    }
-
-    public static async verifyProfessionalPasswordResetOTP(req: Request, res: Response) {
-        const { email, otp } = req.body;
-        const serviceResult = await Authentication.service.verifyPasswordResetOTP(email, otp, UserType.PROFESSIONAL);
-        res.status(serviceResult.statusCode).json(serviceResult.json);
-    }
-
-    public static async resetUserPassword(req: Request, res: Response) {
-        const { resetToken, newPassword } = req.body;
-        const serviceResult = await Authentication.service.resetPassword(resetToken, newPassword, UserType.USER);
-        res.status(serviceResult.statusCode).json(serviceResult.json);
-    }
-
-    public static async resetProfessionalPassword(req: Request, res: Response) {
-        const { resetToken, newPassword } = req.body;
-        const serviceResult = await Authentication.service.resetPassword(resetToken, newPassword, UserType.PROFESSIONAL);
-        res.status(serviceResult.statusCode).json(serviceResult.json);
-    }
-
     // public static async googleAuth(req: Request, res: Response) {
     //     const state = JSON.parse(req.query.state as string);
     //     const type = state.type;

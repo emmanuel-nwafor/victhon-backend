@@ -30,16 +30,4 @@ export default class OTPCache extends BaseCache {
 	public async deleteVerificationOTP(email: string, userType: UserType) {
 		return this.delete(this.buildKey(email, userType));
 	}
-
-	public async setPasswordResetOTP(email: string, userType: UserType, otp: string) {
-		return this.set(this.buildKey(email, userType, OTPType.Reset), { otp });
-	}
-
-	public async getPasswordResetOTP(email: string, userType: UserType) {
-		return this.get(this.buildKey(email, userType, OTPType.Reset));
-	}
-
-	public async deletePasswordResetOTP(email: string, userType: UserType) {
-		return this.delete(this.buildKey(email, userType, OTPType.Reset));
-	}
 }

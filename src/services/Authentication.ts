@@ -6,7 +6,7 @@ import { Professional } from "../entities/Professional";
 import { User } from "../entities/User";
 import { HttpStatus, UserType } from "../types/constants";
 import deleteFiles from "../utils/deleteFiles";
-import { sendOTP, sendPasswordOTP } from "../utils/mailer";
+import { sendOTP } from "../utils/mailer";
 import Password from "../utils/Password";
 import Service from "./Service";
 import Token from "./Token";
@@ -30,17 +30,6 @@ export default class Authentication extends Service {
     }
 
     await sendOTP(email, otp);
-    return true;
-  }
-
-  private async issuePasswordResetOTP(email: string, userType: UserType) {
-    const otp = this.generateOTP();
-    const cached = await this.otpCache.setPasswordResetOTP(email, userType, otp);
-    if (!cached) {
-      return false;
-    }
-
-    await sendPasswordOTP(email, otp);
     return true;
   }
 
@@ -121,29 +110,21 @@ export default class Authentication extends Service {
   public async signUp(email: string, password: string) {
     try {
       const userRepository = AppDataSource.getRepository(User);
-      console.log("Checking for existing user with email:", email);
 
-      let existingUser = await userRepository.findOneBy({ email: email });
-      if (existingUser && existingUser.isVerified) {
+      let userEmailExists = await userRepository.findOneBy({ email: email });
+      if (userEmailExists) {
         return this.responseData(400, true, `Email already exists.`);
       }
 
       password = Password.hashPassword(password, this.storedSalt);
 
-      let savedUser: any;
+      const user = userRepository.create({
+        email,
+        password,
+        isVerified: false,
+      });
 
-      if (existingUser && !existingUser.isVerified) {
-        // Allow re-signup for unverified users: update password and re-issue OTP
-        existingUser.password = password;
-        savedUser = await userRepository.save(existingUser);
-      } else {
-        const user = userRepository.create({
-          email,
-          password,
-          isVerified: false,
-        });
-        savedUser = await userRepository.save(user);
-      }
+      const savedUser: any = await userRepository.save(user);
 
       const otpIssued = await this.issueVerificationOTP(email, UserType.USER);
       if (!otpIssued) {
@@ -294,28 +275,21 @@ export default class Authentication extends Service {
     try {
       const professionalRepo = AppDataSource.getRepository(Professional);
 
-      let existingUser = await professionalRepo.findOneBy({ email: email });
-      if (existingUser && existingUser.isVerified) {
+      let userEmailExists = await professionalRepo.findOneBy({ email: email });
+      if (userEmailExists) {
         return this.responseData(400, true, `Email already exists.`);
       }
 
       password = Password.hashPassword(password, this.storedSalt);
 
-      let savedUser: any;
+      const user = professionalRepo.create({
+        email,
+        password,
+        location: `POINT(${0} ${0})` as any,
+        isVerified: false,
+      });
 
-      if (existingUser && !existingUser.isVerified) {
-        // Allow re-signup for unverified users: update password and re-issue OTP
-        existingUser.password = password;
-        savedUser = await professionalRepo.save(existingUser);
-      } else {
-        const user = professionalRepo.create({
-          email,
-          password,
-          location: `POINT(${0} ${0})` as any,
-          isVerified: false,
-        });
-        savedUser = await professionalRepo.save(user);
-      }
+      const savedUser: any = await professionalRepo.save(user);
 
       const otpIssued = await this.issueVerificationOTP(
         email,
@@ -591,115 +565,6 @@ export default class Authentication extends Service {
         HttpStatus.OK,
         false,
         "A new OTP has been sent to your email",
-      );
-    } catch (error) {
-      return super.handleTypeormError(error);
-    }
-  }
-
-  public async forgotPassword(email: string, userType: UserType) {
-    try {
-      const repo = userType === UserType.USER
-        ? AppDataSource.getRepository(User)
-        : AppDataSource.getRepository(Professional);
-
-      const user = await repo.findOneBy({ email });
-      if (!user) {
-        // Return success even if email not found to prevent email enumeration
-        return this.responseData(
-          HttpStatus.OK,
-          false,
-          "If an account with that email exists, an OTP has been sent.",
-        );
-      }
-
-      const otpIssued = await this.issuePasswordResetOTP(email, userType);
-      if (!otpIssued) {
-        return this.responseData(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          true,
-          "Unable to send OTP at the moment. Please try again.",
-        );
-      }
-
-      return this.responseData(
-        HttpStatus.OK,
-        false,
-        "If an account with that email exists, an OTP has been sent.",
-      );
-    } catch (error) {
-      return super.handleTypeormError(error);
-    }
-  }
-
-  public async verifyPasswordResetOTP(email: string, otp: string, userType: UserType) {
-    try {
-      const otpResult = await this.otpCache.getPasswordResetOTP(email, userType);
-      if (otpResult.error) {
-        return this.responseData(
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          true,
-          "Unable to verify OTP at the moment. Please try again.",
-        );
-      }
-
-      if (!otpResult.data || otpResult.data.otp !== otp) {
-        return this.responseData(
-          HttpStatus.BAD_REQUEST,
-          true,
-          "Invalid or expired OTP",
-        );
-      }
-
-      await this.otpCache.deletePasswordResetOTP(email, userType);
-
-      // Issue a short-lived token for the password reset step
-      const resetToken = this.generateOTPToken(email, "password-reset", "10m");
-
-      return this.responseData(HttpStatus.OK, false, "OTP verified successfully", {
-        resetToken,
-      });
-    } catch (error) {
-      return super.handleTypeormError(error);
-    }
-  }
-
-  public async resetPassword(resetToken: string, newPassword: string, userType: UserType) {
-    try {
-      const tokenResult = Token.validateToken(resetToken, ["password-reset"], this.tokenSecret);
-      if (tokenResult.error) {
-        return this.responseData(
-          HttpStatus.BAD_REQUEST,
-          true,
-          "Invalid or expired reset token. Please request a new OTP.",
-        );
-      }
-
-      const email = tokenResult.data.data.email;
-      const hashedPassword = Password.hashPassword(newPassword, this.storedSalt);
-
-      if (userType === UserType.USER) {
-        const userRepo = AppDataSource.getRepository(User);
-        const user = await userRepo.findOneBy({ email });
-        if (!user) {
-          return this.responseData(HttpStatus.NOT_FOUND, true, "User was not found");
-        }
-        user.password = hashedPassword;
-        await userRepo.save(user);
-      } else {
-        const professionalRepo = AppDataSource.getRepository(Professional);
-        const user = await professionalRepo.findOneBy({ email });
-        if (!user) {
-          return this.responseData(HttpStatus.NOT_FOUND, true, "User was not found");
-        }
-        user.password = hashedPassword;
-        await professionalRepo.save(user);
-      }
-
-      return this.responseData(
-        HttpStatus.OK,
-        false,
-        "Password has been reset successfully",
       );
     } catch (error) {
       return super.handleTypeormError(error);
