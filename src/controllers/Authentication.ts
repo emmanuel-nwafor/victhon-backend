@@ -43,6 +43,30 @@ export default class Authentication {
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 
+    public static async verifyUserOTP(req: Request, res: Response) {
+        const { email, otp } = req.body;
+        const serviceResult = await Authentication.service.verifyOTP(email, otp, UserType.USER);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
+    public static async verifyProfessionalOTP(req: Request, res: Response) {
+        const { email, otp } = req.body;
+        const serviceResult = await Authentication.service.verifyOTP(email, otp, UserType.PROFESSIONAL);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
+    public static async resendUserOTP(req: Request, res: Response) {
+        const { email } = req.body;
+        const serviceResult = await Authentication.service.resendOTP(email, UserType.USER);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
+    public static async resendProfessionalOTP(req: Request, res: Response) {
+        const { email } = req.body;
+        const serviceResult = await Authentication.service.resendOTP(email, UserType.PROFESSIONAL);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
     // public static async googleAuth(req: Request, res: Response) {
     //     const state = JSON.parse(req.query.state as string);
     //     const type = state.type;

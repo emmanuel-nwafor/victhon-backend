@@ -1,11 +1,11 @@
 // @ts-ignore
+import rateLimit from "express-rate-limit";
 import { body } from 'express-validator';
-import { handleValidationErrors } from "../validators";
-import { ResourceType } from "../../types/constants";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import { createStore } from "../../config/redis";
-import uploads, { mediaUpload } from '../multer';
 import multer from "multer";
+import { createStore } from "../../config/redis";
+import { ResourceType } from "../../types/constants";
+import uploads from '../multer';
+import { handleValidationErrors } from "../validators";
 
 
 const signUpLimiter = rateLimit({
@@ -191,4 +191,31 @@ export const professionalSignUp = [
 
     handleValidationErrors
 
+];
+
+export const verifyOTP = [
+    body('email')
+        .isEmail()
+        .withMessage('Email must be a valid email address')
+        .isLength({ max: 255 })
+        .withMessage('Email must be at most 255 characters')
+        .normalizeEmail(),
+    body('otp')
+        .isString()
+        .withMessage('OTP must be a string')
+        .isLength({ min: 6, max: 6 })
+        .withMessage('OTP must be 6 digits long')
+        .matches(/^\d{6}$/)
+        .withMessage('OTP must contain only digits'),
+    handleValidationErrors
+];
+
+export const resendOTP = [
+    body('email')
+        .isEmail()
+        .withMessage('Email must be a valid email address')
+        .isLength({ max: 255 })
+        .withMessage('Email must be at most 255 characters')
+        .normalizeEmail(),
+    handleValidationErrors
 ];

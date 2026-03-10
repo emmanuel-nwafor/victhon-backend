@@ -21,6 +21,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@getbrevo/brevo": "^4.0.1",
     "@socket.io/redis-adapter": "^8.3.0",
     "@socket.io/sticky": "^1.0.4",
     "amqp-connection-manager": "^5.0.0",
@@ -89,4 +90,4 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
-}                                                                                              
+}

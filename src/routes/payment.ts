@@ -1,15 +1,15 @@
 import express, { Router } from 'express';
 import asyncHandler from "express-async-handler";
-import Controller  from '../controllers/Payment';
-import {initializeValidator, withdrawValidator} from "./../middlewares/routes/payment";
+import Controller from '../controllers/Payment';
 import verifyJWT from "../middlewares/verifyJWT";
-import {UserType} from "../types/constants";
+import { UserType } from "../types/constants";
+import { initializeValidator, withdrawValidator } from "./../middlewares/routes/payment";
 
 const paymentRouter = Router();
 
 paymentRouter.get('/initialize/booking/:bookingId', initializeValidator, asyncHandler(Controller.initializeBookingPayment));
 paymentRouter.get('/initialize/booking/refund/:bookingId', initializeValidator, asyncHandler(Controller.bookingRefund));
-paymentRouter.get('/verify/:reference',verifyJWT([UserType.USER]), asyncHandler(Controller.verifyPaystackTransaction));
+paymentRouter.get('/verify/:reference',verifyJWT([UserType.USER]), asyncHandler(Controller.verifyFlwTransaction));
 paymentRouter.post('/withdraw',withdrawValidator, asyncHandler(Controller.withdraw));
 
 

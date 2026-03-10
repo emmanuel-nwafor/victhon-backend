@@ -1,4 +1,4 @@
-import {config} from "dotenv";
+import { config } from "dotenv";
 
 config();
 
@@ -26,6 +26,10 @@ export enum EnvKey {
     RABBIT_MQ = 'rabbitMQ',
     PAYSTACK_SECRET_KEY = 'paystackSecret',
     PLATFORM_FEE_PERCENT = 'platformFeePercent',
+    FLW_SECRET_KEY = 'flwSecretKey',
+    FLW_SECRET_HASH = 'flwSecretHash',
+    FLW_REDIRECT_URL = 'flwRedirectUrl',
+
 }
 
 export default function env(key: EnvKey): string | undefined {
@@ -53,6 +57,9 @@ export default function env(key: EnvKey): string | undefined {
         [EnvKey.RABBIT_MQ]: process.env.RABBITMQ_URL!,
         [EnvKey.PAYSTACK_SECRET_KEY]: process.env.PAYSTACK_SECRET_KEY!,
         [EnvKey.PLATFORM_FEE_PERCENT]: process.env.PLATFORM_FEE_PERCENT!,
+        [EnvKey.FLW_SECRET_KEY]: process.env.FLW_SECRET_KEY!,
+        [EnvKey.FLW_SECRET_HASH]: process.env.FLW_SECRET_HASH!,
+        [EnvKey.FLW_REDIRECT_URL]: process.env.FLW_REDIRECT_URL!,
     };
     return envValues[key];
 }
