@@ -122,20 +122,26 @@ export default class Authentication extends Service {
     try {
       const userRepository = AppDataSource.getRepository(User);
 
-      let userEmailExists = await userRepository.findOneBy({ email: email });
-      if (userEmailExists) {
+      let existingUser = await userRepository.findOneBy({ email: email });
+      if (existingUser && existingUser.isVerified) {
         return this.responseData(400, true, `Email already exists.`);
       }
 
       password = Password.hashPassword(password, this.storedSalt);
 
-      const user = userRepository.create({
-        email,
-        password,
-        isVerified: false,
-      });
+      let savedUser: any;
 
-      const savedUser: any = await userRepository.save(user);
+      if (existingUser && !existingUser.isVerified) {
+        existingUser.password = password;
+        savedUser = await userRepository.save(existingUser);
+      } else {
+        const user = userRepository.create({
+          email,
+          password,
+          isVerified: false,
+        });
+        savedUser = await userRepository.save(user);
+      }
 
       const otpIssued = await this.issueVerificationOTP(email, UserType.USER);
       if (!otpIssued) {
@@ -286,21 +292,27 @@ export default class Authentication extends Service {
     try {
       const professionalRepo = AppDataSource.getRepository(Professional);
 
-      let userEmailExists = await professionalRepo.findOneBy({ email: email });
-      if (userEmailExists) {
+      let existingUser = await professionalRepo.findOneBy({ email: email });
+      if (existingUser && existingUser.isVerified) {
         return this.responseData(400, true, `Email already exists.`);
       }
 
       password = Password.hashPassword(password, this.storedSalt);
 
-      const user = professionalRepo.create({
-        email,
-        password,
-        location: `POINT(${0} ${0})` as any,
-        isVerified: false,
-      });
+      let savedUser: any;
 
-      const savedUser: any = await professionalRepo.save(user);
+      if (existingUser && !existingUser.isVerified) {
+        existingUser.password = password;
+        savedUser = await professionalRepo.save(existingUser);
+      } else {
+        const user = professionalRepo.create({
+          email,
+          password,
+          location: `POINT(${0} ${0})` as any,
+          isVerified: false,
+        });
+        savedUser = await professionalRepo.save(user);
+      }
 
       const otpIssued = await this.issueVerificationOTP(
         email,
