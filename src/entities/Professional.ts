@@ -1,26 +1,22 @@
-import "reflect-metadata"
+import "reflect-metadata";
 import {
-    Entity,
-    PrimaryColumn,
     Column,
     CreateDateColumn,
-    UpdateDateColumn,
-    OneToMany,
-    ManyToOne,
+    Entity,
     Index,
-    Unique,
-    JoinColumn,
+    OneToMany,
+    OneToOne,
     PrimaryGeneratedColumn,
-    OneToOne
+    UpdateDateColumn
 } from 'typeorm';
 import { Account } from "./Account";
+import ChatParticipant from "./ChatParticipant";
 import { ProfessionalSchedule } from "./ProfessionalSchedule";
 import { RatingAggregate } from "./RatingAggregate";
 import { Review } from "./Review";
+import { Setting } from "./SettingEntity";
 import { Transaction } from "./Transaction";
 import { Wallet } from "./Wallet";
-import ChatParticipant from "./ChatParticipant";
-import { Setting } from "./SettingEntity";
 
 // import { AuthProvider } from "./User";
 
@@ -44,7 +40,7 @@ export class Professional {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
-    @Column({ type: 'varchar', length: 50, unique: true })
+    @Column({ type: 'varchar', length: 254, unique: true })
     email: string;
 
     @Column({ type: 'varchar', length: 20, unique: true, nullable: true })

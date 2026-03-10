@@ -219,3 +219,44 @@ export const resendOTP = [
         .normalizeEmail(),
     handleValidationErrors
 ];
+
+export const forgotPassword = [
+    body('email')
+        .isEmail()
+        .withMessage('Email must be a valid email address')
+        .isLength({ max: 255 })
+        .withMessage('Email must be at most 255 characters')
+        .normalizeEmail(),
+    handleValidationErrors
+];
+
+export const verifyPasswordResetOTP = [
+    body('email')
+        .isEmail()
+        .withMessage('Email must be a valid email address')
+        .isLength({ max: 255 })
+        .withMessage('Email must be at most 255 characters')
+        .normalizeEmail(),
+    body('otp')
+        .isString()
+        .withMessage('OTP must be a string')
+        .isLength({ min: 6, max: 6 })
+        .withMessage('OTP must be 6 digits long')
+        .matches(/^\d{6}$/)
+        .withMessage('OTP must contain only digits'),
+    handleValidationErrors
+];
+
+export const resetPassword = [
+    body('resetToken')
+        .isString()
+        .notEmpty()
+        .withMessage('Reset token is required'),
+    body('newPassword')
+        .isString()
+        .notEmpty()
+        .withMessage('New password is required')
+        .isLength({ min: 8 })
+        .withMessage('Password must be at least 8 characters long'),
+    handleValidationErrors
+];

@@ -1,20 +1,15 @@
-import "reflect-metadata"
+import "reflect-metadata";
 import {
-    Entity,
-    PrimaryColumn,
     Column,
     CreateDateColumn,
-    UpdateDateColumn,
+    Entity,
     OneToMany,
-    ManyToOne,
-    Index,
-    Unique,
-    JoinColumn,
-    PrimaryGeneratedColumn
+    PrimaryGeneratedColumn,
+    UpdateDateColumn
 } from 'typeorm';
-import { Review } from "./Review";
-import {Transaction} from "./Transaction";
 import ChatParticipant from "./ChatParticipant";
+import { Review } from "./Review";
+import { Transaction } from "./Transaction";
 
 export interface PhotoField {
     url: string;
@@ -37,7 +32,7 @@ export class User {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
-    @Column({ type: 'varchar', length: 50, unique: true })
+    @Column({ type: 'varchar', length: 254, unique: true })
     email: string;
 
     @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
