@@ -26,15 +26,6 @@ export default class Account extends Service {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // CREATE ACCOUNT
-  //
-  // Paystack: GET /bank/resolve?account_number=xxx&bank_code=xxx
-  // Flutterwave: POST /v3/accounts/resolve { account_number, account_bank }
-  //
-  // Flutterwave returns:
-  //   { status: "success", data: { account_number: "...", account_name: "..." } }
-  // ─────────────────────────────────────────────────────────────
   public async createAccount(
     professionalId: string,
     name: string,
@@ -50,12 +41,6 @@ export default class Account extends Service {
 
       if (!professional)
         return this.responseData(404, true, "User was not found");
-
-      // Verify the account number is valid before saving
-      await this.flwClient.post("/accounts/resolve", {
-        account_number: accountNumber,
-        account_bank: bankCode,
-      });
 
       const account = this.repo.create({
         professional,
@@ -74,13 +59,6 @@ export default class Account extends Service {
       );
     } catch (error) {
       console.log(error);
-      if (axios.isAxiosError(error)) {
-        return this.responseData(
-          400,
-          true,
-          error.response?.data?.message ?? "Invalid bank details",
-        );
-      }
       return this.handleTypeormError(error);
     }
   }
@@ -201,6 +179,7 @@ export default class Account extends Service {
   public async banks() {
     try {
       const res = await this.flwClient.get("/banks/NG");
+      console.log(res.data);
       return this.responseData(
         200,
         false,

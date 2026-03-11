@@ -1,34 +1,34 @@
 import cors from "cors";
-import http from 'http';
-import express, {Application, NextFunction, Request, Response} from "express";
-import morgan from "morgan";
-import {createClient, RedisClientType} from "redis";
+import express, { Application, NextFunction, Request, Response } from "express";
 import helmet from "helmet";
-import {AppDataSource} from "../data-source";
-import {User} from "../entities/User";
+import http from 'http';
+import morgan from "morgan";
+import { RedisClientType } from "redis";
+import { AppDataSource } from "../data-source";
+import { User } from "../entities/User";
 import multerErrorHandler from "../middlewares/multerErrorHandler";
 import initializeIO from "./io";
 import logger from "./logger";
 
-import auth from "../routes/auth";
-import user from "../routes/user";
-import professional from "../routes/professional";
 import account from "../routes/account";
-import schedule from "../routes/schedule";
+import auth from "../routes/auth";
 import booking from "../routes/booking";
-import service from "../routes/service";
-import review from "../routes/review";
-import payment from "../routes/payment";
-import wallet from "../routes/wallet";
 import chat from "../routes/chat";
+import payment from "../routes/payment";
+import professional from "../routes/professional";
+import review from "../routes/review";
+import schedule from "../routes/schedule";
+import service from "../routes/service";
+import user from "../routes/user";
+import wallet from "../routes/wallet";
 
 
-import verifyJWT from "../middlewares/verifyJWT";
-import {Namespaces, UserType} from "../types/constants";
-import validateJWT from "../middlewares/validateJWT";
-import socketEvent from "../io/events/socketEvent";
+import { RedisStore } from "connect-redis";
 import session from "express-session";
-import {RedisStore} from "connect-redis";
+import socketEvent from "../io/events/socketEvent";
+import validateJWT from "../middlewares/validateJWT";
+import verifyJWT from "../middlewares/verifyJWT";
+import { Namespaces, UserType } from "../types/constants";
 
 
 export default async function createApp(pubClient: RedisClientType, subClient: RedisClientType) {
