@@ -37,17 +37,10 @@ export default class Payment extends BaseService {
 
   private readonly FLW_SECRET_KEY = env(EnvKey.FLW_SECRET_KEY)!;
 
-  // This is NOT your secret key — it's a plain custom string you define yourself
-  // on the Flutterwave Dashboard → Settings → Webhooks → "Secret hash"
   private readonly FLW_SECRET_HASH = env(EnvKey.FLW_SECRET_HASH)!;
 
-  // The URL Flutterwave redirects to after payment completes
-  // Flutterwave appends: ?status=successful&tx_ref=booking_xxx&transaction_id=12345678
   private readonly FLW_REDIRECT_URL = env(EnvKey.FLW_REDIRECT_URL)!;
 
-  // ─────────────────────────────────────────────────────────────
-  // Shared axios instance — Authorization: Bearer <secret_key>
-  // ─────────────────────────────────────────────────────────────
   private get flwClient() {
     return axios.create({
       baseURL: FLW_BASE_URL,
@@ -58,17 +51,6 @@ export default class Payment extends BaseService {
     });
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // INITIALIZE BOOKING PAYMENT
-  //
-  // Flow:
-  //   1. Backend calls POST /v3/payments → Flutterwave returns a hosted link
-  //   2. Backend returns { payment_link, tx_ref } to frontend
-  //   3. Frontend redirects the user to payment_link
-  //   4. After payment Flutterwave redirects back to FLW_REDIRECT_URL with:
-  //      ?status=successful&tx_ref=booking_xxx&transaction_id=12345678
-  //   5. Frontend calls GET /payment/verify/:transaction_id to confirm
-  // ─────────────────────────────────────────────────────────────
   public async initializeBookingPayment(bookingId: string, userId: string) {
     try {
       const booking = await this.bookingRepo.findOne({
@@ -99,41 +81,6 @@ export default class Payment extends BaseService {
         );
       }
 
-      // Helper to call Flutterwave and get a fresh payment link
-      const getFreshPaymentLink = async (
-        tx_ref: string,
-        transactionId: string,
-      ) => {
-        const response = await this.flwClient.post("/payments", {
-          tx_ref,
-          amount: Number(booking.escrow.amount),
-          currency: "NGN",
-          redirect_url: this.FLW_REDIRECT_URL,
-          customer: {
-            email: booking.user.email,
-            name: `${booking.user.firstName} ${booking.user.lastName}`,
-            phonenumber: booking.user.phone ?? "",
-          },
-          meta: {
-            type: TransactionType.BOOKING_DEPOSIT,
-            transactionId,
-            userId,
-            escrowId: booking.escrow.id,
-          },
-          customizations: {
-            title: "Booking Payment",
-            description: `Payment for booking #${bookingId}`,
-          },
-        });
-
-        if (response.data?.status === "success") {
-          return response.data.data.link as string;
-        }
-
-        return null;
-      };
-
-      // Idempotency: if a pending transaction exists, refresh its payment link
       const existingTx = await this.transactionRepo.findOne({
         where: {
           escrowId: booking.escrow.id,
@@ -143,26 +90,9 @@ export default class Payment extends BaseService {
       });
 
       if (existingTx) {
-        // Always generate a fresh link — the old one may have expired
-        const payment_link = await getFreshPaymentLink(
-          existingTx.reference,
-          existingTx.id,
-        );
-
-        if (!payment_link) {
-          return this.responseData(500, true, "Failed to refresh payment link");
-        }
-
-        existingTx.paymentLink = payment_link;
-        await this.transactionRepo.save(existingTx);
-
-        return this.responseData(200, false, "Payment initialized", {
-          payment_link,
-          tx_ref: existingTx.reference,
-        });
+        await this.transactionRepo.delete(existingTx.id);
       }
 
-      // No existing transaction — create a fresh one
       const tx_ref = `booking_${booking.id}_${Date.now()}`;
 
       const transaction = this.transactionRepo.create({
@@ -176,43 +106,52 @@ export default class Payment extends BaseService {
       });
       await this.transactionRepo.save(transaction);
 
-      const payment_link = await getFreshPaymentLink(tx_ref, transaction.id);
+      const response = await this.flwClient.post("/payments", {
+        tx_ref,
+        amount: Number(booking.escrow.amount),
+        currency: "NGN",
+        redirect_url: this.FLW_REDIRECT_URL,
+        customer: {
+          email: booking.user.email,
+          name: `${booking.user.firstName} ${booking.user.lastName}`,
+          phonenumber: booking.user.phone ?? "",
+        },
+        meta: {
+          type: TransactionType.BOOKING_DEPOSIT,
+          transactionId: transaction.id,
+          userId,
+          escrowId: booking.escrow.id,
+        },
+        customizations: {
+          title: "Booking Payment",
+          description: `Payment for booking #${bookingId}`,
+        },
+      });
 
-      if (!payment_link) {
-        return this.responseData(500, true, "Payment initialization failed");
+      if (response.data?.status === "success") {
+        const payment_link: string = response.data.data.link;
+
+        transaction.status = TransactionStatus.PENDING;
+        await this.transactionRepo.save(transaction);
+
+        return this.responseData(
+          200,
+          false,
+          "Payment was initiated successfully",
+          {
+            payment_link,
+            tx_ref,
+          },
+        );
       }
 
-      transaction.status = TransactionStatus.PENDING;
-      transaction.paymentLink = payment_link;
-      await this.transactionRepo.save(transaction);
-
-      return this.responseData(
-        200,
-        false,
-        "Payment was initiated successfully",
-        {
-          payment_link,
-          tx_ref,
-        },
-      );
+      return this.responseData(500, true, "Payment initialization failed");
     } catch (error) {
       console.error(error);
       return this.handleTypeormError(error);
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // VERIFY TRANSACTION (internal — used by reconciliation job)
-  //
-  // Paystack: GET /transaction/verify/:reference  (string reference)
-  // Flutterwave: GET /v3/transactions/:transaction_id/verify  (numeric ID)
-  //
-  // The numeric transaction_id comes from:
-  //   - The ?transaction_id= query param in the redirect URL
-  //   - The data.id field in the webhook payload
-  //
-  // We store this as flwTransactionId on the Transaction entity.
-  // ─────────────────────────────────────────────────────────────
   public async verifyFlwTransaction(flwTransactionId: string | number) {
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000;
@@ -258,15 +197,6 @@ export default class Payment extends BaseService {
     };
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // VERIFY TRANSACTION SERVICE (HTTP endpoint — called by frontend after redirect)
-  //
-  // After the Flutterwave redirect, the frontend receives:
-  //   ?status=successful&tx_ref=booking_xxx&transaction_id=12345678
-  //
-  // The frontend calls: GET /payment/verify/:transaction_id
-  // This endpoint hits Flutterwave to confirm the transaction is genuine.
-  // ─────────────────────────────────────────────────────────────
   public async verifyFlwTransactionService(flwTransactionId: string) {
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000;
@@ -279,12 +209,66 @@ export default class Payment extends BaseService {
 
         const data = response.data?.data;
 
-        // Save flwTransactionId on the transaction record using tx_ref
-        if (data?.tx_ref) {
+        if (!data)
+          return this.responseData(
+            400,
+            true,
+            "Transaction not found on Flutterwave",
+          );
+
+        const isSuccessful = data.status === "successful";
+
+        if (data.tx_ref) {
+          // Save flwTransactionId on transaction record
           await this.transactionRepo.update(
             { reference: data.tx_ref },
-            { flwTransactionId: String(flwTransactionId) },
+            {
+              flwTransactionId: String(flwTransactionId),
+              status: isSuccessful
+                ? TransactionStatus.SUCCESS
+                : TransactionStatus.FAILED,
+            },
           );
+
+          // If successful, mark escrow as PAID directly (don't rely on webhook alone)
+          if (isSuccessful) {
+            const transaction = await this.transactionRepo.findOne({
+              where: { reference: data.tx_ref },
+              relations: [
+                "escrow",
+                "escrow.booking",
+                "escrow.booking.professional",
+                "escrow.booking.professional.wallet",
+              ],
+            });
+
+            if (
+              transaction?.escrow &&
+              transaction.escrow.status !== EscrowStatus.PAID
+            ) {
+              await this.escrowRepo.update(
+                { id: transaction.escrow.id },
+                { status: EscrowStatus.PAID },
+              );
+
+              // Update wallet pending amount
+              const wallet = transaction.escrow.booking?.professional?.wallet;
+              if (wallet) {
+                const newPendingAmount =
+                  Number(wallet.pendingAmount) +
+                  Number(transaction.escrow.amount);
+                const newTotalBalance =
+                  Number(wallet.balance) + newPendingAmount;
+                await this.walletRepo.update(
+                  { id: wallet.id },
+                  {
+                    pendingAmount: newPendingAmount,
+                    totalBalance: newTotalBalance,
+                  },
+                );
+              }
+            }
+          }
         }
 
         return this.responseData(
@@ -311,12 +295,6 @@ export default class Payment extends BaseService {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // RECONCILE PENDING TRANSACTIONS
-  // Logic unchanged — only the verify call is updated.
-  // Requires flwTransactionId to be stored on the Transaction entity
-  // (set when the frontend calls verify after the redirect).
-  // ─────────────────────────────────────────────────────────────
   public async reconcilePendingTransactions() {
     const BATCH_SIZE = 100;
     const TIMEOUT_MS = 30 * 60 * 1000;
@@ -820,25 +798,6 @@ export default class Payment extends BaseService {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // WEBHOOK
-  //
-  // Flutterwave webhook verification is DIFFERENT from Paystack:
-  //
-  //   Paystack:      HMAC-SHA512 of raw body → compare to 'x-paystack-signature' header
-  //   Flutterwave:   Plain string comparison of 'verif-hash' header
-  //                  against FLW_SECRET_HASH env var (a custom string YOU set on the dashboard)
-  //
-  // To set up: Flutterwave Dashboard → Settings → Webhooks → "Secret hash"
-  // Set FLW_SECRET_HASH in your .env to that same string.
-  //
-  // Flutterwave event names:
-  //   charge.completed  → payment (data.status === 'successful' | 'failed')
-  //   transfer.completed → payout (data.status === 'SUCCESSFUL' | 'FAILED')
-  //
-  // Note: Flutterwave does NOT have a dedicated refund webhook event.
-  // Refund status is confirmed inline when the refund API call succeeds.
-  // ─────────────────────────────────────────────────────────────
   public async webhook(payload: any, signature: any) {
     // Plain string comparison — NOT an HMAC hash
     if (!signature || signature !== this.FLW_SECRET_HASH) {
@@ -881,21 +840,6 @@ export default class Payment extends BaseService {
     return this.responseData(200, false, null);
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // WITHDRAW (Payout to professional's bank account)
-  //
-  // Paystack: 2 steps — POST /transferrecipient → POST /transfer
-  // Flutterwave: 1 step — POST /v3/transfers  (bank details passed directly)
-  //
-  // Fields:
-  //   account_bank   = 3-digit bank code, e.g. "044" for Access Bank
-  //   account_number = NUBAN account number
-  //   amount         = NGN amount (NOT kobo)
-  //   reference      = your unique reference for this transfer
-  //   currency       = "NGN"
-  //   narration      = description shown on recipient's statement
-  //   debit_currency = "NGN"
-  // ─────────────────────────────────────────────────────────────
   public async withdraw(userId: string, accountId: string, amount: number) {
     try {
       const account = await this.accountRepo.findOne({

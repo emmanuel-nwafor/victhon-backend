@@ -20,13 +20,6 @@ export default class Payment {
         Controller.response(res, serviceResult);
     }
 
-    // Renamed from verifyPaystackTransaction / verifyPayazaTransaction → verifyFlwTransaction
-    //
-    // The frontend calls this after Flutterwave redirects back with:
-    //   ?status=successful&tx_ref=booking_xxx&transaction_id=12345678
-    //
-    // Pass the transaction_id (numeric) from the query params as :transactionId
-    // Route: GET /payment/verify/:transactionId
     public static async verifyFlwTransaction(req: Request, res: Response) {
         const { transactionId } = req.params;
         const serviceResult = await Payment.service.verifyFlwTransactionService(transactionId!);
@@ -47,9 +40,6 @@ export default class Payment {
     }
 
     public static async webhook(req: Request, res: Response) {
-        // Flutterwave sends a plain string in 'verif-hash' header
-        // (set on your Flutterwave Dashboard → Settings → Webhooks → "Secret hash")
-        // This is NOT an HMAC — it's a direct string you define yourself
         const signature = req.headers['verif-hash'];
 
         const serviceResult = await Payment.service.webhook((req as any).rawBody, signature);
