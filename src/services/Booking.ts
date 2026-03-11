@@ -463,12 +463,17 @@ export default class BookingService extends Service {
           throw new Error("Booking not found");
         }
 
-        if (booking.status !== BookingStatus.REVIEW) {
+        // Allow completion from either REVIEW or ACCEPTED status
+        if (
+          ![BookingStatus.REVIEW, BookingStatus.ACCEPTED].includes(
+            booking.status,
+          )
+        ) {
           throw new Error("Booking cannot be completed");
         }
 
         if (booking.escrow.status !== EscrowStatus.PAID) {
-          throw new Error("Booking cannot be completed");
+          throw new Error("Booking has not been paid yet");
         }
 
         if (booking.escrow.refundStatus !== RefundStatus.NONE) {
