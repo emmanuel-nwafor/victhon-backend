@@ -21,8 +21,8 @@ export default class Payment {
     }
 
     public static async verifyFlwTransaction(req: Request, res: Response) {
-        const { transactionId } = req.params;
-        const serviceResult = await Payment.service.verifyFlwTransactionService(transactionId!);
+        const { reference } = req.params;
+        const serviceResult = await Payment.service.verifyFlwTransactionService(reference!);
         Controller.response(res, serviceResult);
     }
 

@@ -277,12 +277,15 @@ export default class Payment extends BaseService {
           "Successful verification",
           response.data,
         );
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Attempt ${attempt} failed:`, error);
+
         if (attempt === MAX_RETRIES) {
-          throw new Error(
-            `Failed to verify transaction after ${MAX_RETRIES} attempts`,
-          );
+          const flwMessage = error?.response?.data?.message;
+          if (flwMessage) {
+            return this.responseData(400, true, flwMessage);
+          }
+          return this.responseData(500, true, "Failed to verify transaction. Please try again later.");
         }
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
       }

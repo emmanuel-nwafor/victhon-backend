@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import express, { Request, Response, Router } from 'express';
 import asyncHandler from "express-async-handler";
 import Controller from '../controllers/Payment';
 import verifyJWT from "../middlewares/verifyJWT";
@@ -6,6 +6,11 @@ import { UserType } from "../types/constants";
 import { initializeValidator, withdrawValidator } from "./../middlewares/routes/payment";
 
 const paymentRouter = Router();
+
+// Test route to verify router is mounted
+paymentRouter.get('/test', (req: Request, res: Response) => {
+    res.json({ message: "Payment router is working" });
+});
 
 paymentRouter.get('/initialize/booking/:bookingId', initializeValidator, asyncHandler(Controller.initializeBookingPayment));
 paymentRouter.get('/initialize/booking/refund/:bookingId', initializeValidator, asyncHandler(Controller.bookingRefund));
