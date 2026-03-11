@@ -10,9 +10,9 @@ import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
 import { NotificationType } from "../entities/Notification";
 import { Professional } from "../entities/Professional";
 import {
-    Transaction,
-    TransactionStatus,
-    TransactionType,
+  Transaction,
+  TransactionStatus,
+  TransactionType,
 } from "../entities/Transaction";
 import { Wallet } from "../entities/Wallet";
 import { QueueEvents, QueueNames, UserType } from "../types/constants";
@@ -78,13 +78,13 @@ export default class Payment extends BaseService {
 
       if (!booking)
         return this.responseData(404, true, "Booking was not found");
-      if (booking.status !== BookingStatus.ACCEPTED)
+      if (booking.escrow.status === EscrowStatus.PAID)
         return this.responseData(
           400,
           true,
-          "Booking has not yet been accepted",
+          "This booking has already been paid",
         );
-      if (booking.escrow.status !== EscrowStatus.PENDING)
+      if (![EscrowStatus.PENDING].includes(booking.escrow.status))
         return this.responseData(400, true, "Cannot pay for this booking");
 
       let wallet = booking.professional.wallet;
@@ -166,7 +166,7 @@ export default class Payment extends BaseService {
           false,
           "Payment was initiated successfully",
           {
-            payment_link, // Frontend redirects user to this URL
+            payment_link,
             tx_ref,
           },
         );
