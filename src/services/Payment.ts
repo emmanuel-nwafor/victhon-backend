@@ -99,7 +99,41 @@ export default class Payment extends BaseService {
         );
       }
 
-      // Idempotency: return existing pending transaction if already initialized
+      // Helper to call Flutterwave and get a fresh payment link
+      const getFreshPaymentLink = async (
+        tx_ref: string,
+        transactionId: string,
+      ) => {
+        const response = await this.flwClient.post("/payments", {
+          tx_ref,
+          amount: Number(booking.escrow.amount),
+          currency: "NGN",
+          redirect_url: this.FLW_REDIRECT_URL,
+          customer: {
+            email: booking.user.email,
+            name: `${booking.user.firstName} ${booking.user.lastName}`,
+            phonenumber: booking.user.phone ?? "",
+          },
+          meta: {
+            type: TransactionType.BOOKING_DEPOSIT,
+            transactionId,
+            userId,
+            escrowId: booking.escrow.id,
+          },
+          customizations: {
+            title: "Booking Payment",
+            description: `Payment for booking #${bookingId}`,
+          },
+        });
+
+        if (response.data?.status === "success") {
+          return response.data.data.link as string;
+        }
+
+        return null;
+      };
+
+      // Idempotency: if a pending transaction exists, refresh its payment link
       const existingTx = await this.transactionRepo.findOne({
         where: {
           escrowId: booking.escrow.id,
@@ -109,16 +143,28 @@ export default class Payment extends BaseService {
       });
 
       if (existingTx) {
-        return this.responseData(200, false, "Payment already initialized", {
-          payment_link: existingTx.paymentLink,
+        // Always generate a fresh link — the old one may have expired
+        const payment_link = await getFreshPaymentLink(
+          existingTx.reference,
+          existingTx.id,
+        );
+
+        if (!payment_link) {
+          return this.responseData(500, true, "Failed to refresh payment link");
+        }
+
+        existingTx.paymentLink = payment_link;
+        await this.transactionRepo.save(existingTx);
+
+        return this.responseData(200, false, "Payment initialized", {
+          payment_link,
           tx_ref: existingTx.reference,
         });
       }
 
-      // Generate unique tx_ref
+      // No existing transaction — create a fresh one
       const tx_ref = `booking_${booking.id}_${Date.now()}`;
 
-      // Create transaction record first (FAILED until Flutterwave confirms)
       const transaction = this.transactionRepo.create({
         userId,
         type: TransactionType.BOOKING_DEPOSIT,
@@ -130,49 +176,25 @@ export default class Payment extends BaseService {
       });
       await this.transactionRepo.save(transaction);
 
-      // Call Flutterwave to create the hosted payment page
-      const response = await this.flwClient.post("/payments", {
-        tx_ref,
-        amount: Number(booking.escrow.amount), // NGN — no kobo conversion needed
-        currency: "NGN",
-        redirect_url: this.FLW_REDIRECT_URL,
-        customer: {
-          email: booking.user.email,
-          name: `${booking.user.firstName} ${booking.user.lastName}`,
-          phonenumber: booking.user.phone ?? "",
-        },
-        meta: {
-          type: TransactionType.BOOKING_DEPOSIT,
-          transactionId: transaction.id,
-          userId,
-          escrowId: booking.escrow.id,
-        },
-        customizations: {
-          title: "Booking Payment",
-          description: `Payment for booking #${bookingId}`,
-        },
-      });
+      const payment_link = await getFreshPaymentLink(tx_ref, transaction.id);
 
-      if (response.data?.status === "success") {
-        const payment_link: string = response.data.data.link;
-
-        // Update transaction to PENDING now that we have the link
-        transaction.status = TransactionStatus.PENDING;
-        transaction.paymentLink = payment_link;
-        await this.transactionRepo.save(transaction);
-
-        return this.responseData(
-          200,
-          false,
-          "Payment was initiated successfully",
-          {
-            payment_link,
-            tx_ref,
-          },
-        );
+      if (!payment_link) {
+        return this.responseData(500, true, "Payment initialization failed");
       }
 
-      return this.responseData(500, true, "Payment initialization failed");
+      transaction.status = TransactionStatus.PENDING;
+      transaction.paymentLink = payment_link;
+      await this.transactionRepo.save(transaction);
+
+      return this.responseData(
+        200,
+        false,
+        "Payment was initiated successfully",
+        {
+          payment_link,
+          tx_ref,
+        },
+      );
     } catch (error) {
       console.error(error);
       return this.handleTypeormError(error);
