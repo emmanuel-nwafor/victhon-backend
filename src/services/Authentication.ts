@@ -649,30 +649,26 @@ export default class Authentication extends Service {
       }
 
       await this.otpCache.deletePasswordResetOTP(email, userType);
+      await this.otpCache.setPasswordResetVerified(email, userType);
 
-      // Issue a short-lived token for the password reset step
-      const resetToken = this.generateOTPToken(email, "password-reset", "10m");
-
-      return this.responseData(HttpStatus.OK, false, "OTP verified successfully", {
-        resetToken,
-      });
+      return this.responseData(HttpStatus.OK, false, "OTP verified successfully");
     } catch (error) {
       return super.handleTypeormError(error);
     }
   }
 
-  public async resetPassword(resetToken: string, newPassword: string, userType: UserType) {
+  public async resetPassword(email: string, newPassword: string, userType: UserType) {
     try {
-      const tokenResult = Token.validateToken(resetToken, ["password-reset"], this.tokenSecret);
-      if (tokenResult.error) {
+      const verifiedResult = await this.otpCache.getPasswordResetVerified(email, userType);
+      if (verifiedResult.error || !verifiedResult.data?.verified) {
         return this.responseData(
           HttpStatus.BAD_REQUEST,
           true,
-          "Invalid or expired reset token. Please request a new OTP.",
+          "Password reset not authorized. Please verify your OTP first.",
         );
       }
 
-      const email = tokenResult.data.data.email;
+      await this.otpCache.deletePasswordResetVerified(email, userType);
       const hashedPassword = Password.hashPassword(newPassword, this.storedSalt);
 
       if (userType === UserType.USER) {

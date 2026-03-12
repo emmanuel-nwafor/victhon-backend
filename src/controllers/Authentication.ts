@@ -92,14 +92,14 @@ export default class Authentication {
     }
 
     public static async resetUserPassword(req: Request, res: Response) {
-        const { resetToken, newPassword } = req.body;
-        const serviceResult = await Authentication.service.resetPassword(resetToken, newPassword, UserType.USER);
+        const { email, newPassword } = req.body;
+        const serviceResult = await Authentication.service.resetPassword(email, newPassword, UserType.USER);
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 
     public static async resetProfessionalPassword(req: Request, res: Response) {
-        const { resetToken, newPassword } = req.body;
-        const serviceResult = await Authentication.service.resetPassword(resetToken, newPassword, UserType.PROFESSIONAL);
+        const { email, newPassword } = req.body;
+        const serviceResult = await Authentication.service.resetPassword(email, newPassword, UserType.PROFESSIONAL);
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 }

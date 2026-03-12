@@ -16,7 +16,6 @@ auth.post("/professionals/login", login, asyncHandler(Authentication.professiona
 auth.post("/professionals/verify-otp", verifyOTP, asyncHandler(Authentication.verifyProfessionalOTP));
 auth.post("/professionals/resend-otp", resendOTP, asyncHandler(Authentication.resendProfessionalOTP));
 
-// Forgot / Reset Password
 auth.post("/users/forgot-password", forgotPassword, asyncHandler(Authentication.forgotUserPassword));
 auth.post("/users/verify-password-reset-otp", verifyPasswordResetOTP, asyncHandler(Authentication.verifyUserPasswordResetOTP));
 auth.post("/users/reset-password", resetPassword, asyncHandler(Authentication.resetUserPassword));

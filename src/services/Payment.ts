@@ -383,10 +383,6 @@ export default class Payment extends BaseService {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // SUCCESSFUL CHARGE (called by RabbitMQ consumer after webhook)
-  // Logic unchanged
-  // ─────────────────────────────────────────────────────────────
   public async successfulCharge(eventData: any) {
     try {
       const { transactionId } = eventData.metadata ?? eventData.meta ?? {};
@@ -494,9 +490,6 @@ export default class Payment extends BaseService {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // DISPUTE (logic unchanged)
-  // ─────────────────────────────────────────────────────────────
   public async dispute(reference: string) {
     try {
       const result = await AppDataSource.transaction(async (manager) => {
@@ -598,7 +591,6 @@ export default class Payment extends BaseService {
   // ─────────────────────────────────────────────────────────────
   // REFUND BOOKING
   //
-  // Paystack: POST /refund { transaction: reference, amount }
   // Flutterwave: POST /v3/transactions/:transaction_id/refund { amount }
   //
   // Flutterwave refunds use the numeric transaction ID (data.id from the charge),

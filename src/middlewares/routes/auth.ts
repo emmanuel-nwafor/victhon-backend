@@ -248,10 +248,12 @@ export const verifyPasswordResetOTP = [
 ];
 
 export const resetPassword = [
-    body('resetToken')
-        .isString()
-        .notEmpty()
-        .withMessage('Reset token is required'),
+    body('email')
+        .isEmail()
+        .withMessage('Email must be a valid email address')
+        .isLength({ max: 255 })
+        .withMessage('Email must be at most 255 characters')
+        .normalizeEmail(),
     body('newPassword')
         .isString()
         .notEmpty()

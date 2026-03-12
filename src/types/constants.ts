@@ -6,6 +6,7 @@ export enum UserType {
 
 export enum OTPType {
     Reset = "passwordReset",
+    ResetVerified = "passwordResetVerified",
     Verification = "emailVerification"
 };
 
