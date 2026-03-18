@@ -1,8 +1,8 @@
-import {AppDataSource} from "../data-source";
-import {CdnFolders, HttpStatus, ResourceType, UserType} from "../types/constants";
+import { AppDataSource } from "../data-source";
+import { CdnFolders, HttpStatus, ResourceType, UserType } from "../types/constants";
 import Service from "./Service";
-import {Professional as ProfessionalEntity} from "../entities/Professional";
-import {EditProfessionalDto, SetupBusinessProfileDto} from "../types";
+import { Professional as ProfessionalEntity } from "../entities/Professional";
+import { EditProfessionalDto, SetupBusinessProfileDto } from "../types";
 import emailValidator from "../validators/emailValidator";
 import Cloudinary from "./Cloudinary";
 import deleteFiles from "../utils/deleteFiles";
@@ -35,9 +35,10 @@ export default class Professional extends Service {
         try {
             const userRepo = AppDataSource.getRepository(ProfessionalEntity);
 
-            let user = await userRepo.findOne({where: {id: userId}});
+            let user = await userRepo.findOne({ where: { id: userId } });
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
             const coords = (user.location as any).replace("POINT(", "").replace(")", "").split(" ");
+
 
             const data = {
                 ...user,
@@ -122,10 +123,10 @@ export default class Professional extends Service {
         } catch (error) {
             // Clean up any already-uploaded files on failure
             for (const publicId of uploadedPublicIds) {
-                await (new Cloudinary()).delete(publicId).catch(() => {});
+                await (new Cloudinary()).delete(publicId).catch(() => { });
             }
-            if (dto.logo) await deleteFiles(dto.logo).catch(() => {});
-            if (dto.ninSlip) await deleteFiles(dto.ninSlip).catch(() => {});
+            if (dto.logo) await deleteFiles(dto.logo).catch(() => { });
+            if (dto.ninSlip) await deleteFiles(dto.ninSlip).catch(() => { });
             return this.handleTypeormError(error);
         }
     }
@@ -136,7 +137,7 @@ export default class Professional extends Service {
     ) {
         try {
             const professional = await this.repo.findOne({
-                where: {id: professionalId}
+                where: { id: professionalId }
             });
 
             if (!professional) return this.responseData(404, true, "Professional not found");
@@ -148,7 +149,7 @@ export default class Professional extends Service {
                 }
 
                 const emailExists = await this.repo.findOne({
-                    where: {email: editData.email}
+                    where: { email: editData.email }
                 });
 
                 if (emailExists) return this.responseData(400, true, "Email already exists");
@@ -157,7 +158,7 @@ export default class Professional extends Service {
             /* ------------------ PHONE VALIDATION ------------------ */
             if (editData.phone && editData.phone !== professional.phone) {
                 const phoneExists = await this.repo.findOne({
-                    where: {phone: editData.phone}
+                    where: { phone: editData.phone }
                 });
 
                 if (phoneExists) return this.responseData(400, true, "Phone number already exists");
@@ -168,7 +169,7 @@ export default class Professional extends Service {
             if (editData.file) {
                 const cloudinary = new Cloudinary();
 
-                const {uploadedFiles, failedFiles} =
+                const { uploadedFiles, failedFiles } =
                     await cloudinary.uploadV2(
                         [editData.file],
                         ResourceType.IMAGE,
@@ -216,7 +217,7 @@ export default class Professional extends Service {
 
             const updatedProfessional =
                 await this.repo.findOne({
-                    where: {id: professionalId}
+                    where: { id: professionalId }
                 });
 
             return this.responseData(
@@ -240,12 +241,12 @@ export default class Professional extends Service {
     ) {
         try {
             const professional = await this.repo.findOne({
-                where: {id: professionalId}
+                where: { id: professionalId }
             });
 
             if (!professional) return this.responseData(404, true, "Professional not found");
 
-            await this.repo.update(professionalId, {availability});
+            await this.repo.update(professionalId, { availability });
 
             return this.responseData(
                 200,
@@ -286,7 +287,7 @@ export default class Professional extends Service {
     public async uploadProfilePicture(userId: string, publicId: string, url: string) {
         try {
 
-            let user = await this.repo.findOneBy({id: userId});
+            let user = await this.repo.findOneBy({ id: userId });
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `User was not found.`);
 
             if (user.profilePicture) return this.responseData(HttpStatus.BAD_REQUEST, true, `User already has a profile picture.`);
