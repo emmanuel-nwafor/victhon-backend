@@ -13,7 +13,7 @@ import {
     PrimaryGeneratedColumn
 } from 'typeorm';
 import { Review } from "./Review";
-import {Transaction} from "./Transaction";
+import { Transaction } from "./Transaction";
 import ChatParticipant from "./ChatParticipant";
 
 export interface PhotoField {
@@ -46,10 +46,10 @@ export class User {
     @Column({ type: 'text', select: false })
     password: string;
 
-    @Column({ type: 'varchar', length: 50 , nullable: true })
+    @Column({ type: 'varchar', length: 50, nullable: true })
     firstName: string;
 
-    @Column({ type: 'varchar', length: 50, nullable: true  })
+    @Column({ type: 'varchar', length: 50, nullable: true })
     lastName: string;
 
     @Column({ type: 'json', nullable: true })
@@ -76,6 +76,9 @@ export class User {
 
     @OneToMany(() => ChatParticipant, (chatParticipants) => chatParticipants.user)
     chatParticipants: ChatParticipant[];
+
+    @Column({ type: 'varchar', nullable: true })
+    pushToken: string;
 
     @CreateDateColumn()
     createdAt: Date;

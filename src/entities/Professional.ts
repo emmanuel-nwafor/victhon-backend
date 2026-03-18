@@ -144,6 +144,9 @@ export class Professional {
     // @OneToMany(() => Favorite, v => v.professional, { cascade: true })
     // favorites: Favorite[];
 
+    @Column({ type: 'varchar', nullable: true })
+    pushToken: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

@@ -209,7 +209,6 @@ export default class Chat extends Service {
                         userId: user.id,
                     })
                     .getOne();
-                    
                 if (chatExists) throw new TransactionError("Chat already exists");
 
                 const newChat = manager.create(ChatEntity, {});
@@ -285,16 +284,12 @@ export default class Chat extends Service {
 
             const qb = this.repo
                 .createQueryBuilder("chat")
-
-                // ✅ Join ALL participants (for response)
+                // Join participants and their profiles
                 .leftJoinAndSelect("chat.participants", "participants")
-
-                // ✅ Join profiles conditionally
                 .leftJoinAndSelect("participants.user", "user")
                 .leftJoinAndSelect("participants.professional", "professional")
 
-
-                // ✅ Join ONLY for filtering
+                // Filtering: Only show chats where the current user is a participant
                 .innerJoin(
                     "chat.participants",
                     "filterParticipant",
@@ -304,14 +299,21 @@ export default class Chat extends Service {
                     { userId }
                 )
 
-                // ✅ Latest message ordering (safe subquery)
+                // ✅ NEW: Join the actual last message object
+                .leftJoinAndMapOne(
+                    "chat.lastMessage",
+                    Message,
+                    "lastMsg",
+                    "lastMsg.id = (SELECT m.id FROM messages m WHERE m.chatId = chat.id ORDER BY m.createdAt DESC LIMIT 1)"
+                )
+
+                // Keep your ordering logic
                 .addSelect(subQuery => {
                     return subQuery
                         .select("MAX(message.createdAt)")
                         .from("messages", "message")
                         .where("message.chatId = chat.id");
                 }, "latestMessageAt")
-
                 .orderBy("latestMessageAt", "DESC")
                 .skip(skip)
                 .take(limit);

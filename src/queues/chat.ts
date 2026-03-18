@@ -1,21 +1,24 @@
-import {Server} from "socket.io";
+import { Server } from "socket.io";
 import RabbitMQRouter from "../utils/RabbitMQRouter";
-import {CdnFolders, Namespaces, QueueEvents, QueueNames, ResourceType, UserType} from "../types/constants";
+import { CdnFolders, Namespaces, QueueEvents, QueueNames, ResourceType, UserType } from "../types/constants";
 import BaseService from "../services/Service";
 import logger from "../config/logger";
-import User from "../services/User";
-import {exchange, FailedFiles, UploadedFiles} from "../types";
-import {AppDataSource} from "../data-source";
-import Professional from "../services/Professional";
+import UserService from "../services/User";
+import { User as UserEntity } from "../entities/User";
+import { Professional as ProfessionalEntity } from "../entities/Professional";
+import ProfessionalService from "../services/Professional";
 import Inbox from "../entities/InboxEntity";
-import Message, {MessageStatus, MessageType} from "../entities/MessageEntity";
-import {In} from "typeorm";
+import Message, { MessageStatus, MessageType } from "../entities/MessageEntity";
+import { In } from "typeorm";
 import Cloudinary from "../services/Cloudinary";
-import {RabbitMQ} from "../services/RabbitMQ";
+import { RabbitMQ } from "../services/RabbitMQ";
 import Handler from "../io/handlers/Handler";
 import deleteFiles from "../utils/deleteFiles";
 import ChatParticipant from "../entities/ChatParticipant";
 import MessageAttachment from "../entities/MessageAttachment";
+import PushNotificationService from "../services/PushNotification";
+import { exchange, FailedFiles, UploadedFiles } from "../types";
+import { AppDataSource } from "../data-source";
 
 const chat = new RabbitMQRouter({
     name: QueueNames.CHAT,
@@ -26,13 +29,14 @@ const chat = new RabbitMQRouter({
 });
 
 const service = new BaseService();
+const pushNotificationService = new PushNotificationService();
 
 chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) => {
-    const {payload: {newMessage, receiverId, receiverType, senderId}} = message;
+    const { payload: { newMessage, receiverId, receiverType, senderId } } = message;
 
     try {
-        const userService = new User();
-        const proService = new Professional();
+        const userService = new UserService();
+        const proService = new ProfessionalService();
         const receiverService = receiverType == UserType.PROFESSIONAL ? proService : userService;
 
         const socketId = receiverType == UserType.PROFESSIONAL ? await proService.getSocketId(receiverId) : await userService.getSocketId(receiverId);
@@ -47,20 +51,20 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                 if (inChat) {
                     await manager.update(Message, {
                         id: newMessage.id,
-                    }, {status: MessageStatus.READ});
+                    }, { status: MessageStatus.READ });
 
-                    if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-read", {messageId: newMessage.id});
+                    if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-read", { messageId: newMessage.id });
                 } else {
                     await manager.update(Message, {
                         id: newMessage.id,
-                    }, {status: MessageStatus.DELIVERED});
+                    }, { status: MessageStatus.DELIVERED });
 
                     await manager.increment(ChatParticipant,
                         {
-                            chat: {id: newMessage.chat.id},
+                            chat: { id: newMessage.chat.id },
                             ...(receiverType === UserType.USER
-                                ? {userId: receiverId}
-                                : {professionalId: receiverId}),
+                                ? { userId: receiverId }
+                                : { professionalId: receiverId }),
                         },
                         'unreadCount',
                         1
@@ -70,7 +74,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
 
 
             socketNamespace.to(socketId).emit("receive-message", newMessage);
-            if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-delivered", {messageId: newMessage.id});
+            if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-delivered", { messageId: newMessage.id });
 
             logger.info(`📧 New message for ${receiverType}:${receiverId}`);
             return;
@@ -82,7 +86,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                     where: {
                         receiverId,
                         receiverType,
-                        message: {id: newMessage.id},
+                        message: { id: newMessage.id },
                     },
                 });
 
@@ -98,16 +102,31 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
 
                 await manager.increment(ChatParticipant,
                     {
-                        chat: {id: newMessage.chat.id},
+                        chat: { id: newMessage.chat.id },
                         ...(receiverType === UserType.USER
-                            ? {userId: receiverId}
-                            : {professionalId: receiverId}),
+                            ? { userId: receiverId }
+                            : { professionalId: receiverId }),
                     },
                     'unreadCount',
                     1
                 );
             });
             logger.info(`📫 ${receiverType}:${receiverId} message has been added to inbox successfully.`);
+
+            const receiver = receiverType === UserType.PROFESSIONAL
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any });
+
+            if (receiver?.pushToken) {
+                logger.info(`📲 Sending push notification for message to ${receiverType}:${receiverId}`);
+                const senderName = newMessage.sender?.firstName ? `${newMessage.sender.firstName}` : "Someone";
+                await pushNotificationService.sendNotification(
+                    receiver.pushToken,
+                    `New Message from ${senderName}`,
+                    newMessage.content || "Sent you an attachment",
+                    { type: "chat", chatId: newMessage.chat.id, messageId: newMessage.id }
+                ).catch(err => logger.error("Failed to send push notification:", err));
+            }
         }
     } catch (error) {
         console.error("CHAT_SEND_MESSAGE: ", error);
@@ -116,7 +135,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
 });
 
 chat.route(QueueEvents.CHAT_MARK_AS_READ, async (message: any, io: Server) => {
-    const {payload: {chat, userType}} = message;
+    const { payload: { chat, userType } } = message;
 
     try {
         const otherParticipant = chat.participants.find((participant: any) => {
@@ -146,15 +165,15 @@ chat.route(QueueEvents.CHAT_MARK_AS_READ, async (message: any, io: Server) => {
             senderId = otherParticipant!.professionalId!;
             senderType = UserType.PROFESSIONAL;
         }
-        const userService = new User();
-        const proService = new Professional();
+        const userService = new UserService();
+        const proService = new ProfessionalService();
 
         const senderSocketId = senderType == UserType.PROFESSIONAL ? await proService.getSocketId(senderId!) : await userService.getSocketId(senderId!);
         const socketNamespace = io.of(Namespaces.BASE);
 
 
         if (senderSocketId) {
-            socketNamespace.to(senderSocketId).emit("messages-read", Handler.responseData(false, "Messages read", {chat}));
+            socketNamespace.to(senderSocketId).emit("messages-read", Handler.responseData(false, "Messages read", { chat }));
             logger.info(
                 `✅📩 Messages read event emitted to ${senderType}:${senderId} for chat${chat.id}`
             );
@@ -171,15 +190,15 @@ chat.route(QueueEvents.CHAT_MARK_AS_READ, async (message: any, io: Server) => {
 });
 
 chat.route(QueueEvents.CHAT_MARK_MESSAGES_AS_READ, async (message: any, io: Server) => {
-    const {payload: {chunk, userId, userType}} = message;
+    const { payload: { chunk, userId, userType } } = message;
 
     try {
         if (!chunk?.length) return;
         const messageRepo = AppDataSource.getRepository(Message);
 
         await AppDataSource.getRepository(Message).update(
-            {id: In(chunk), receiverId: userId, receiverType: userType, status: MessageStatus.DELIVERED},
-            {status: MessageStatus.READ}
+            { id: In(chunk), receiverId: userId, receiverType: userType, status: MessageStatus.DELIVERED },
+            { status: MessageStatus.READ }
         );
 
         const messages = await messageRepo.find({
@@ -196,8 +215,8 @@ chat.route(QueueEvents.CHAT_MARK_MESSAGES_AS_READ, async (message: any, io: Serv
             messagesBySender[msg.senderId]!.push(msg.id);
         }
 
-        const userService = new User();
-        const proService = new Professional();
+        const userService = new UserService();
+        const proService = new ProfessionalService();
         const socketNamespace = io.of(Namespaces.BASE);
 
         await Promise.all(Object.entries(messagesBySender).map(async ([senderId, messageIds]) => {
@@ -220,7 +239,7 @@ chat.route(QueueEvents.CHAT_MARK_MESSAGES_AS_READ, async (message: any, io: Serv
 });
 
 chat.route(QueueEvents.CHAT_DELETE_MESSAGES, async (message: any, io: Server) => {
-    const {payload: {chunk, userId, userType}} = message;
+    const { payload: { chunk, userId, userType } } = message;
 
     try {
         if (!chunk?.length) return;
@@ -231,27 +250,11 @@ chat.route(QueueEvents.CHAT_DELETE_MESSAGES, async (message: any, io: Server) =>
 
             logger.info(`💀 Deleting messages for ${userType}:${userId}...`);
 
-            // const BATCH_SIZE = 1000; // you can adjust based on your DB limits
-            // const allAttachments: MessageAttachment[] = [];
-            //
-            // for (let i = 0; i < chunk.length; i += BATCH_SIZE) {
-            //     const batchIds = chunk.slice(i, i + BATCH_SIZE);
-            //
-            //     const attachments = await manager
-            //         .getRepository(MessageAttachment)
-            //         .createQueryBuilder("attachment")
-            //         .leftJoin("attachment.message", "message")
-            //         .where("message.id IN (:...ids)", { ids: batchIds })
-            //         .getMany();
-            //
-            //     allAttachments.push(...attachments);
-            // }
-
             const attachments = await manager
                 .getRepository(MessageAttachment)
                 .createQueryBuilder("attachment")
                 .leftJoin("attachment.message", "message")
-                .where("message.id IN (:...ids)", {ids: chunk})
+                .where("message.id IN (:...ids)", { ids: chunk })
                 .getMany();
 
             const publicIds = attachments.map(attachment => attachment.publicId);
@@ -266,8 +269,8 @@ chat.route(QueueEvents.CHAT_DELETE_MESSAGES, async (message: any, io: Server) =>
             logger.info(`💀 Messages for ${userType}:${userId} has been deleted successfully`);
         });
 
-        const userService = new User();
-        const proService = new Professional();
+        const userService = new UserService();
+        const proService = new ProfessionalService();
         const socketNamespace = io.of(Namespaces.BASE);
 
         const socketId = userType === UserType.PROFESSIONAL
@@ -286,10 +289,10 @@ chat.route(QueueEvents.CHAT_DELETE_MESSAGES, async (message: any, io: Server) =>
 });
 
 chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) => {
-    const {payload: {chatId, receiverId, receiverType, senderId, files, content, senderType}} = message;
+    const { payload: { chatId, receiverId, receiverType, senderId, files, content, senderType } } = message;
     const messageRepo = AppDataSource.getRepository(Message);
-    let uploadedFiles: UploadedFiles[] = [], publicIds: string[] = [], failedFiles: FailedFiles[] = [];
     const cloudinary = new Cloudinary();
+    let uploadedFiles: UploadedFiles[] = [], publicIds: string[] = [], failedFiles: FailedFiles[] = [];
 
     try {
         let images: {
@@ -301,11 +304,10 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
             duration: string | null
         }[] = [];
 
-        const userService = new User();
-        const proService = new Professional();
-        const receiverSocketId = receiverType == UserType.PROFESSIONAL ? await proService.getSocketId(receiverId) : await userService.getSocketId(receiverId);
-        const senderSocketId = senderType == UserType.PROFESSIONAL ? await proService.getSocketId(senderId) : await userService.getSocketId(senderId);
+        const userService = new UserService();
+        const proService = new ProfessionalService();
         const socketNamespace = io.of(Namespaces.BASE);
+        const senderSocketId = senderType == UserType.PROFESSIONAL ? await proService.getSocketId(senderId) : await userService.getSocketId(senderId);
 
         if (files) {
             ({
@@ -329,8 +331,11 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
                 duration: upload.duration,
             }));
         }
+
+        const receiverSocketId = receiverType == UserType.PROFESSIONAL ? await proService.getSocketId(receiverId) : await userService.getSocketId(receiverId);
+
         const newMessage = messageRepo.create({
-            chat: {id: chatId},
+            chat: { id: chatId },
             senderId,
             senderType,
             receiverType,
@@ -345,7 +350,7 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
         if (createdMessage) {
             await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_ATTACHMENT, {
                 eventType: QueueEvents.CHAT_RECEIVE_ATTACHMENT,
-                payload: {newMessage, receiverId, receiverType, senderId},
+                payload: { newMessage, receiverId, receiverType, senderId },
             });
         }
     } catch (error) {
@@ -362,11 +367,11 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
 });
 
 chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server) => {
-    const {payload: {newMessage, receiverId, receiverType, senderId}} = message;
+    const { payload: { newMessage, receiverId, receiverType, senderId } } = message;
 
     try {
-        const userService = new User();
-        const proService = new Professional();
+        const userService = new UserService();
+        const proService = new ProfessionalService();
         const socketId = receiverType == UserType.PROFESSIONAL ? await proService.getSocketId(receiverId) : await userService.getSocketId(receiverId);
         const senderSocketId = receiverType == UserType.USER ? await proService.getSocketId(senderId) : await userService.getSocketId(senderId);
         const socketNamespace = io.of(Namespaces.BASE);
@@ -376,26 +381,25 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
 
         if (socketId) {
             const inChat = await receiverService.userChats.present(receiverId, newMessage.chat.id);
-            const socketNamespace = io.of(Namespaces.BASE);
 
             await AppDataSource.transaction(async (manager) => {
                 if (inChat) {
                     await manager.update(Message, {
                         id: newMessage.id,
-                    }, {status: MessageStatus.READ});
+                    }, { status: MessageStatus.READ });
 
-                    if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-read", {messageId: newMessage.id});
+                    if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-read", { messageId: newMessage.id });
                 } else {
                     await manager.update(Message, {
                         id: newMessage.id,
-                    }, {status: MessageStatus.DELIVERED});
+                    }, { status: MessageStatus.DELIVERED });
 
                     await manager.increment(ChatParticipant,
                         {
-                            chat: {id: newMessage.chat.id},
+                            chat: { id: newMessage.chat.id },
                             ...(receiverType === UserType.USER
-                                ? {userId: receiverId}
-                                : {professionalId: receiverId}),
+                                ? { userId: receiverId }
+                                : { professionalId: receiverId }),
                         },
                         'unreadCount',
                         1
@@ -405,7 +409,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
 
 
             socketNamespace.to(socketId).emit("receive-attachment", newMessage);
-            if (senderSocketId) socketNamespace.to(senderSocketId).emit("attachment-delivered", {messageId: newMessage.id});
+            if (senderSocketId) socketNamespace.to(senderSocketId).emit("attachment-delivered", { messageId: newMessage.id });
 
             logger.info(`📧 New message attachment for ${receiverType}:${receiverId}`);
             return;
@@ -417,7 +421,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
                     where: {
                         receiverId,
                         receiverType,
-                        message: {id: newMessage.id},
+                        message: { id: newMessage.id },
                     },
                 });
 
@@ -433,75 +437,37 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
 
                 await manager.increment(ChatParticipant,
                     {
-                        chat: {id: newMessage.chat.id},
+                        chat: { id: newMessage.chat.id },
                         ...(receiverType === UserType.USER
-                            ? {userId: receiverId}
-                            : {professionalId: receiverId}),
+                            ? { userId: receiverId }
+                            : { professionalId: receiverId }),
                     },
                     'unreadCount',
                     1
                 );
             });
             logger.info(`📫 ${receiverType}:${receiverId} message attachment has been added to inbox successfully.`);
+
+            // Send push notification for attachment as well
+            const receiver = receiverType === UserType.PROFESSIONAL
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any });
+
+            if (receiver?.pushToken) {
+                logger.info(`� Sending push notification for attachment to ${receiverType}:${receiverId}`);
+                const senderName = newMessage.sender?.firstName ? `${newMessage.sender.firstName}` : "Someone";
+                await pushNotificationService.sendNotification(
+                    receiver.pushToken,
+                    `New Attachment from ${senderName}`,
+                    "Sent you an attachment",
+                    { type: "chat", chatId: newMessage.chat.id, messageId: newMessage.id }
+                ).catch(err => logger.error("Failed to send push notification:", err));
+            }
         }
     } catch (error) {
         console.error("CHAT_RECEIVE_ATTACHMENT: ", error);
         service.handleTypeormError(error);
     }
 });
-
-
-// chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server) => {
-//     const {payload: {newMessage, receiverId, receiverType, senderId}} = message;
-//
-//     try {
-//         const userService = new User();
-//         const proService = new Professional();
-//         const socketId = receiverType == UserType.PROFESSIONAL ? await proService.getSocketId(receiverId) : await userService.getSocketId(receiverId);
-//         const senderSocketId = receiverType == UserType.USER ? await proService.getSocketId(senderId) : await userService.getSocketId(senderId);
-//         const socketNamespace = io.of(Namespaces.BASE);
-//
-//         if (senderSocketId) socketNamespace.to(senderSocketId).emit("attachment-sent", newMessage);
-//
-//         if (socketId) {
-//             await AppDataSource.getRepository(Message).update({
-//                 id: newMessage.id,
-//             }, {status: MessageStatus.DELIVERED});
-//
-//             socketNamespace.to(socketId).emit("receive-attachment", newMessage);
-//             if (senderSocketId) socketNamespace.to(senderSocketId).emit("attachment-delivered", {messageId: newMessage.id});
-//
-//             logger.info(`📧 New attachment message for ${receiverType}:${receiverId}`);
-//             return;
-//         } else {
-//             logger.info(`📴 ${receiverType}:${receiverId} is offline`);
-//
-//             await AppDataSource.transaction(async (manager) => {
-//
-//                 const existingInbox = await manager.findOne(Inbox, {
-//                     where: {
-//                         receiverId,
-//                         receiverType,
-//                         message: {id: newMessage.id},
-//                     },
-//                 });
-//
-//                 if (!existingInbox) {
-//                     const newInbox = manager.create(Inbox, {
-//                         receiverId,
-//                         receiverType,
-//                         message: newMessage
-//                     });
-//
-//                     await manager.save(newInbox);
-//                 }
-//             });
-//             logger.info(`📫 ${receiverType}:${receiverId} attachment message has been added to inbox successfully.`);
-//         }
-//     } catch (error) {
-//         console.error("CHAT_RECEIVE_ATTACHMENT: ", error);
-//         service.handleTypeormError(error);
-//     }
-// });
 
 export default chat;

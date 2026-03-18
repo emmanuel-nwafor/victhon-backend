@@ -1,13 +1,16 @@
-import {Server} from "socket.io";
+import { Server } from "socket.io";
 import RabbitMQRouter from "../utils/RabbitMQRouter";
-import {Namespaces, QueueEvents, QueueNames, UserType} from "../types/constants";
-import {Notification, NotificationStatus} from "../entities/Notification";
+import { Namespaces, QueueEvents, QueueNames, UserType } from "../types/constants";
+import { Notification, NotificationStatus } from "../entities/Notification";
 import BaseService from "../services/Service";
 import logger from "../config/logger";
-import User from "../services/User";
-import {exchange} from "../types";
-import {AppDataSource} from "../data-source";
-import Professional from "../services/Professional";
+import UserService from "../services/User";
+import { User as UserEntity } from "../entities/User";
+import { Professional as ProfessionalEntity } from "../entities/Professional";
+import ProfessionalService from "../services/Professional";
+import PushNotificationService from "../services/PushNotification";
+import { exchange } from "../types";
+import { AppDataSource } from "../data-source";
 
 
 const notification = new RabbitMQRouter({
@@ -19,21 +22,22 @@ const notification = new RabbitMQRouter({
 });
 
 const service = new BaseService();
+const pushNotificationService = new PushNotificationService();
 
 notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Server) => {
-    const {payload: {provider, data}} = message;
+    const { payload: { provider, data } } = message;
 
     try {
 
         if (provider == "socket") {
 
-            const userService = new User();
-            const proService = new Professional();
+            const userService = new UserService();
+            const proService = new ProfessionalService();
 
             const socketId = data.userType == UserType.PROFESSIONAL ? await proService.getSocketId(data.userId) : await userService.getSocketId(data.userId);
             const repo = AppDataSource.getRepository(Notification);
 
-            const userId = data.userType == UserType.PROFESSIONAL ? {professionalId: data.userId} : {userId: data.userId};
+            const userId = data.userType == UserType.PROFESSIONAL ? { professionalId: data.userId } : { userId: data.userId };
             const newNotification = repo.create({
                 ...userId,
                 type: data.type,
@@ -44,13 +48,31 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
 
             const notification = await repo.save(newNotification);
 
+            const recipient = data.userType === UserType.PROFESSIONAL
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: data.userId }, select: ["pushToken"] })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: data.userId }, select: ["pushToken"] });
+
             if (socketId) {
                 logger.info(`🏃 Notifying ${data.userType}:${data.userId}, notification type:${data.type}`)
 
                 const notificationNamespace = io.of(Namespaces.BASE);
-                notificationNamespace.to(socketId).emit("notification", {notification});
+                notificationNamespace.to(socketId).emit("notification", { notification });
             } else {
                 logger.info(`📴 user:${data.userId} is offline`)
+            }
+
+            if (recipient?.pushToken) {
+                logger.info(`📲 Sending push notification to ${data.userType}:${data.userId}`);
+                // You can customize the body based on notification type if needed
+                const title = "New Notification";
+                const body = `You have a new ${data.type} notification`;
+
+                await pushNotificationService.sendNotification(
+                    recipient.pushToken,
+                    title,
+                    body,
+                    { type: data.type, notificationId: notification.id }
+                ).catch(err => logger.error("Failed to send push notification:", err));
             }
         }
     } catch (error) {
@@ -60,13 +82,13 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
 
 
 notification.route(QueueEvents.NOTIFICATION_OFFLINE, async (message: any, io: Server) => {
-    const {payload: {provider, data}} = message;
+    const { payload: { provider, data } } = message;
 
     try {
 
         if (provider == "socket") {
 
-            const userService = new User();
+            const userService = new UserService();
             const socketId = await userService.getSocketId(data.userId);
 
             if (socketId) {
