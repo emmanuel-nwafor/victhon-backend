@@ -1,11 +1,22 @@
-import { Expo, ExpoPushMessage } from 'expo-server-sdk';
 import logger from '../config/logger';
 
 export default class PushNotificationService {
-    private expo: Expo;
+    private expo: any; // Using any because types are loaded dynamically
 
     constructor() {
-        this.expo = new Expo();
+        // We will initialize this inside the methods to ensure the module is loaded
+        this.expo = null;
+    }
+
+    /**
+     * Helper to ensure Expo is loaded dynamically
+     */
+    private async getExpoClient() {
+        if (!this.expo) {
+            const { Expo } = await import('expo-server-sdk');
+            this.expo = new Expo();
+        }
+        return this.expo;
     }
 
     /**
@@ -17,12 +28,15 @@ export default class PushNotificationService {
         body: string,
         data: any = {}
     ) {
+        const { Expo } = await import('expo-server-sdk');
+        const expoClient = await this.getExpoClient();
+
         if (!Expo.isExpoPushToken(pushToken)) {
             logger.error(`Push token ${pushToken} is not a valid Expo push token`);
             return;
         }
 
-        const messages: ExpoPushMessage[] = [{
+        const messages: any[] = [{
             to: pushToken,
             sound: 'default',
             title,
@@ -31,11 +45,11 @@ export default class PushNotificationService {
         }];
 
         try {
-            const chunks = this.expo.chunkPushNotifications(messages);
+            const chunks = expoClient.chunkPushNotifications(messages);
             const tickets = [];
             for (const chunk of chunks) {
                 try {
-                    const ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
+                    const ticketChunk = await expoClient.sendPushNotificationsAsync(chunk);
                     tickets.push(...ticketChunk);
                 } catch (error) {
                     logger.error('Error sending push notification chunk:', error);
@@ -54,7 +68,10 @@ export default class PushNotificationService {
     public async sendMultipleNotifications(
         notifications: { pushToken: string; title: string; body: string; data?: any }[]
     ) {
-        const messages: ExpoPushMessage[] = [];
+        const { Expo } = await import('expo-server-sdk');
+        const expoClient = await this.getExpoClient();
+
+        const messages: any[] = [];
         for (const n of notifications) {
             if (Expo.isExpoPushToken(n.pushToken)) {
                 messages.push({
@@ -69,11 +86,11 @@ export default class PushNotificationService {
             }
         }
 
-        const chunks = this.expo.chunkPushNotifications(messages);
+        const chunks = expoClient.chunkPushNotifications(messages);
         const tickets = [];
         for (const chunk of chunks) {
             try {
-                const ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
+                const ticketChunk = await expoClient.sendPushNotificationsAsync(chunk);
                 tickets.push(...ticketChunk);
             } catch (error) {
                 logger.error('Error sending push notification chunk:', error);

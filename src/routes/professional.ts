@@ -1,12 +1,13 @@
 import { Router, Request, Response } from 'express';
 import asyncHandler from "express-async-handler";
 import Controller from "../controllers/Professional";
-import { editProfessionalValidator, validatePhotoField } from '../middlewares/routes/professional';
+import { editProfessionalValidator, setupBusinessProfileValidator, validatePhotoField } from '../middlewares/routes/professional';
 
 const professional = Router();
 
 professional.get("/", asyncHandler(Controller.profile));
 professional.patch("/", editProfessionalValidator, asyncHandler(Controller.editProfessionalProfile));
+professional.post("/setup-business-profile", setupBusinessProfileValidator, asyncHandler(Controller.setupBusinessProfile));
 
 // professional.get("/views", asyncHandler(Controller.views));
 // professional.patch("/profile-photo", validatePhotoField, asyncHandler(Controller.uploadProfilePicture));

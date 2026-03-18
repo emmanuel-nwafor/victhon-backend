@@ -2,7 +2,7 @@ import {AppDataSource} from "../data-source";
 import {CdnFolders, HttpStatus, ResourceType, UserType} from "../types/constants";
 import Service from "./Service";
 import {Professional as ProfessionalEntity} from "../entities/Professional";
-import {EditProfessionalDto} from "../types";
+import {EditProfessionalDto, SetupBusinessProfileDto} from "../types";
 import emailValidator from "../validators/emailValidator";
 import Cloudinary from "./Cloudinary";
 import deleteFiles from "../utils/deleteFiles";
@@ -49,6 +49,83 @@ export default class Professional extends Service {
             return this.responseData(HttpStatus.OK, false, `User was retrieved successfully.`, data);
 
         } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    async setupBusinessProfile(
+        professionalId: string,
+        dto: SetupBusinessProfileDto
+    ) {
+        const cloudinary = new Cloudinary();
+        const uploadedPublicIds: string[] = [];
+
+        try {
+            const professional = await this.repo.findOne({ where: { id: professionalId } });
+            if (!professional) return this.responseData(404, true, "Professional not found");
+
+            /* --- Upload business logo --- */
+            let profilePicture = professional.profilePicture;
+            if (dto.logo) {
+                const { uploadedFiles, failedFiles } = await cloudinary.uploadV2(
+                    [dto.logo],
+                    ResourceType.IMAGE,
+                    CdnFolders.PROFILEPICTURE
+                );
+
+                if (failedFiles?.length) {
+                    return this.responseData(500, true, "Logo upload failed", failedFiles);
+                }
+
+                // Delete the old logo from Cloudinary if it exists
+                if (professional.profilePicture?.publicId) {
+                    await cloudinary.delete(professional.profilePicture.publicId);
+                }
+
+                profilePicture = {
+                    url: uploadedFiles[0]!.url,
+                    publicId: uploadedFiles[0]!.publicId,
+                };
+                uploadedPublicIds.push(uploadedFiles[0]!.publicId);
+            }
+
+            /* --- Upload NIN slip --- */
+            let ninSlipUrl = professional.ninSlipUrl ?? null;
+            if (dto.ninSlip) {
+                const { uploadedFiles, failedFiles } = await cloudinary.uploadV2(
+                    [dto.ninSlip],
+                    ResourceType.IMAGE,
+                    CdnFolders.PROFILEPICTURE   // reuse existing folder; adjust if you add a dedicated one
+                );
+
+                if (failedFiles?.length) {
+                    return this.responseData(500, true, "NIN slip upload failed", failedFiles);
+                }
+
+                ninSlipUrl = uploadedFiles[0]!.url;
+                uploadedPublicIds.push(uploadedFiles[0]!.publicId);
+            }
+
+            await this.repo.update(professionalId, {
+                businessName: dto.businessName,
+                businessCategory: dto.businessCategory,
+                businessType: dto.businessType,
+                ninNumber: dto.ninNumber,
+                ninSlipUrl: ninSlipUrl ?? undefined,
+                profilePicture: profilePicture!,
+            });
+
+            const updated = await this.repo.findOne({ where: { id: professionalId } });
+
+            return this.responseData(200, false, "Business profile set up successfully", updated);
+
+        } catch (error) {
+            // Clean up any already-uploaded files on failure
+            for (const publicId of uploadedPublicIds) {
+                await (new Cloudinary()).delete(publicId).catch(() => {});
+            }
+            if (dto.logo) await deleteFiles(dto.logo).catch(() => {});
+            if (dto.ninSlip) await deleteFiles(dto.ninSlip).catch(() => {});
             return this.handleTypeormError(error);
         }
     }

@@ -114,3 +114,34 @@ export const validatePhotoField = [
         .isString().withMessage("publicId must be a string"),
     handleValidationErrors
 ];
+
+export const setupBusinessProfileValidator = [
+    // Accept two image fields: logo and ninSlip
+    uploads(ResourceType.IMAGE).fields([
+        { name: 'logo', maxCount: 1 },
+        { name: 'ninSlip', maxCount: 1 },
+    ]),
+
+    body("businessName")
+        .notEmpty().withMessage("Business name is required")
+        .isString()
+        .isLength({ max: 100 }).withMessage("Business name must not exceed 100 characters"),
+
+    body("businessCategory")
+        .notEmpty().withMessage("Business category is required")
+        .isString()
+        .isLength({ max: 100 }).withMessage("Business category must not exceed 100 characters"),
+
+    body("businessType")
+        .notEmpty().withMessage("Registration type is required")
+        .isString()
+        .isLength({ max: 100 }).withMessage("Registration type must not exceed 100 characters"),
+
+    body("ninNumber")
+        .notEmpty().withMessage("NIN number is required")
+        .isString()
+        .isLength({ min: 11, max: 11 }).withMessage("NIN must be exactly 11 digits")
+        .matches(/^\d{11}$/).withMessage("NIN must contain only digits"),
+
+    handleValidationErrors
+];

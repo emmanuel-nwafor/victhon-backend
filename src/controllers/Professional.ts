@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import Controller from "./Controller";
 import Service from "../services/Professional";
-import { EditProfessionalDto } from "../types";
+import { EditProfessionalDto, SetupBusinessProfileDto } from "../types";
 
 
 export default class Professional {
@@ -21,6 +21,23 @@ export default class Professional {
         const { id: userId } = res.locals.data;
 
         const serviceResult = await Professional.service.editProfessionalProfile(userId, editData);
+        Controller.response(res, serviceResult);
+    }
+
+    public static async setupBusinessProfile(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+
+        const dto: SetupBusinessProfileDto = {
+            businessName: req.body.businessName,
+            businessCategory: req.body.businessCategory,
+            businessType: req.body.businessType,
+            ninNumber: req.body.ninNumber,
+            logo: files?.logo?.[0],
+            ninSlip: files?.ninSlip?.[0],
+        };
+
+        const serviceResult = await Professional.service.setupBusinessProfile(userId, dto);
         Controller.response(res, serviceResult);
     }
 }

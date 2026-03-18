@@ -11,7 +11,7 @@ const brevo = new BrevoClient({
 
 const SENDER = { name: "Victhon", email: "noreply@victhon.co" };
 // Update this URL with your actual hosted logo URL
-const LOGO_URL = "https://victhon.co/assets/logo.png";
+const LOGO_URL = "https://res.cloudinary.com/dquiwougr/image/upload/v1773849444/logo_ogpivr.png";
 
 /**
  * Shared Email Wrapper (The Shell)

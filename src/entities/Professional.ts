@@ -147,6 +147,21 @@ export class Professional {
     @Column({ type: 'varchar', nullable: true })
     pushToken: string;
 
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    businessName: string;
+
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    businessCategory: string;
+
+    @Column({ type: 'varchar', length: 100, nullable: true })
+    businessType: string;
+
+    @Column({ type: 'varchar', length: 11, nullable: true })
+    ninNumber: string;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    ninSlipUrl: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

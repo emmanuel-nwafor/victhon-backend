@@ -35,6 +35,15 @@ export class EditProfessionalDto {
     file?: Express.Multer.File | undefined;
 };
 
+export class SetupBusinessProfileDto {
+    businessName: string;
+    businessCategory: string;
+    businessType: string;
+    ninNumber: string;
+    logo?: Express.Multer.File | undefined;    // business logo image
+    ninSlip?: Express.Multer.File | undefined; // NIN slip / ID card image
+};
+
 export interface UploadedImageData {
     mimeType: string;
     imageUrl: string;
