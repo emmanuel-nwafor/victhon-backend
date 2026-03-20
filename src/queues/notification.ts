@@ -8,7 +8,6 @@ import UserService from "../services/User";
 import { User as UserEntity } from "../entities/User";
 import { Professional as ProfessionalEntity } from "../entities/Professional";
 import ProfessionalService from "../services/Professional";
-import PushNotificationService from "../services/PushNotification";
 import { exchange } from "../types";
 import { AppDataSource } from "../data-source";
 
@@ -22,7 +21,6 @@ const notification = new RabbitMQRouter({
 });
 
 const service = new BaseService();
-const pushNotificationService = new PushNotificationService();
 
 notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Server) => {
     const { payload: { provider, data } } = message;
@@ -49,8 +47,8 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             const notification = await repo.save(newNotification);
 
             const recipient = data.userType === UserType.PROFESSIONAL
-                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: data.userId }, select: ["pushToken"] })
-                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: data.userId }, select: ["pushToken"] });
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: data.userId } })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: data.userId } });
 
             if (socketId) {
                 logger.info(`🏃 Notifying ${data.userType}:${data.userId}, notification type:${data.type}`)
@@ -59,20 +57,6 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
                 notificationNamespace.to(socketId).emit("notification", { notification });
             } else {
                 logger.info(`📴 user:${data.userId} is offline`)
-            }
-
-            if (recipient?.pushToken) {
-                logger.info(`📲 Sending push notification to ${data.userType}:${data.userId}`);
-                // You can customize the body based on notification type if needed
-                const title = "New Notification";
-                const body = `You have a new ${data.type} notification`;
-
-                await pushNotificationService.sendNotification(
-                    recipient.pushToken,
-                    title,
-                    body,
-                    { type: data.type, notificationId: notification.id }
-                ).catch(err => logger.error("Failed to send push notification:", err));
             }
         }
     } catch (error) {

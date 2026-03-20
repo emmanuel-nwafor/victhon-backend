@@ -2,13 +2,11 @@ import { NextFunction, Request, Response, Router } from 'express';
 import asyncHandler from "express-async-handler";
 import passport from '../config/passport';
 import Authentication from "../controllers/Authentication";
-import PushTokenController from "../controllers/PushToken";
 import verifyJWT from '../middlewares/verifyJWT';
 import { UserType } from '../types/constants';
 import { forgotPassword, login, professionalSignUp, resendOTP, resetPassword, userSignUp, verifyOTP, verifyPasswordResetOTP } from "../middlewares/routes/auth";
 
 const auth = Router();
-const pushTokenController = new PushTokenController();
 
 auth.post("/users/sign-up", userSignUp, asyncHandler(Authentication.signUp));
 auth.post("/users/login", login, asyncHandler(Authentication.login));
@@ -47,6 +45,5 @@ auth.get('/google', (req: Request, res: Response, next: NextFunction) => {
 //     }
 // );
 
-auth.post("/push-token", verifyJWT([UserType.USER, UserType.PROFESSIONAL]), asyncHandler(pushTokenController.saveToken.bind(pushTokenController)));
 
 export default auth;

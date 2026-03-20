@@ -77,9 +77,6 @@ export class User {
     @OneToMany(() => ChatParticipant, (chatParticipants) => chatParticipants.user)
     chatParticipants: ChatParticipant[];
 
-    @Column({ type: 'varchar', nullable: true })
-    pushToken: string;
-
     @CreateDateColumn()
     createdAt: Date;
 

@@ -16,7 +16,6 @@ import Handler from "../io/handlers/Handler";
 import deleteFiles from "../utils/deleteFiles";
 import ChatParticipant from "../entities/ChatParticipant";
 import MessageAttachment from "../entities/MessageAttachment";
-import PushNotificationService from "../services/PushNotification";
 import { exchange, FailedFiles, UploadedFiles } from "../types";
 import { AppDataSource } from "../data-source";
 
@@ -29,7 +28,6 @@ const chat = new RabbitMQRouter({
 });
 
 const service = new BaseService();
-const pushNotificationService = new PushNotificationService();
 
 chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) => {
     const { payload: { newMessage, receiverId, receiverType, senderId } } = message;
@@ -112,21 +110,6 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                 );
             });
             logger.info(`📫 ${receiverType}:${receiverId} message has been added to inbox successfully.`);
-
-            const receiver = receiverType === UserType.PROFESSIONAL
-                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any })
-                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any });
-
-            if (receiver?.pushToken) {
-                logger.info(`📲 Sending push notification for message to ${receiverType}:${receiverId}`);
-                const senderName = newMessage.sender?.firstName ? `${newMessage.sender.firstName}` : "Someone";
-                await pushNotificationService.sendNotification(
-                    receiver.pushToken,
-                    `New Message from ${senderName}`,
-                    newMessage.content || "Sent you an attachment",
-                    { type: "chat", chatId: newMessage.chat.id, messageId: newMessage.id }
-                ).catch(err => logger.error("Failed to send push notification:", err));
-            }
         }
     } catch (error) {
         console.error("CHAT_SEND_MESSAGE: ", error);
@@ -447,22 +430,6 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
                 );
             });
             logger.info(`📫 ${receiverType}:${receiverId} message attachment has been added to inbox successfully.`);
-
-            // Send push notification for attachment as well
-            const receiver = receiverType === UserType.PROFESSIONAL
-                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any })
-                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: receiverId } as any, select: ["pushToken", "firstName", "lastName"] as any });
-
-            if (receiver?.pushToken) {
-                logger.info(`� Sending push notification for attachment to ${receiverType}:${receiverId}`);
-                const senderName = newMessage.sender?.firstName ? `${newMessage.sender.firstName}` : "Someone";
-                await pushNotificationService.sendNotification(
-                    receiver.pushToken,
-                    `New Attachment from ${senderName}`,
-                    "Sent you an attachment",
-                    { type: "chat", chatId: newMessage.chat.id, messageId: newMessage.id }
-                ).catch(err => logger.error("Failed to send push notification:", err));
-            }
         }
     } catch (error) {
         console.error("CHAT_RECEIVE_ATTACHMENT: ", error);

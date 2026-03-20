@@ -144,9 +144,6 @@ export class Professional {
     // @OneToMany(() => Favorite, v => v.professional, { cascade: true })
     // favorites: Favorite[];
 
-    @Column({ type: 'varchar', nullable: true })
-    pushToken: string;
-
     @Column({ type: 'varchar', length: 100, nullable: true })
     businessName: string;
 
