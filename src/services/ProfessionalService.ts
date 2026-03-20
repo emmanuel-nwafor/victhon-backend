@@ -181,29 +181,29 @@ export default class ProfessionalService extends Service {
                 // 1️⃣ Spatial index filter (FAST)
                 .where(
                     `
-                               MBRContains(
-                                 ST_GeomFromText(
-                                   'POLYGON((
-                                     ${minLng} ${minLat},
-                                     ${maxLng} ${minLat},
-                                     ${maxLng} ${maxLat},
-                                     ${minLng} ${maxLat},
-                                     ${minLng} ${minLat}
-                                   ))',
-                                   4326
-                                 ),
-                                 professional.location
-                               )
-                               `
+                              MBRContains(
+                                ST_GeomFromText(
+                                  'POLYGON((
+                                    ${minLng} ${minLat},
+                                    ${maxLng} ${minLat},
+                                    ${maxLng} ${maxLat},
+                                    ${minLng} ${maxLat},
+                                    ${minLng} ${minLat}
+                                  ))',
+                                  4326
+                                ),
+                                professional.location
+                              )
+                              `
                 )
                 // 2️⃣ Accurate distance filter
                 .andWhere(
                     `
-                               ST_Distance_Sphere(
-                                 professional.location,
-                                 ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)
-                               ) <= :radius
-                               `
+                              ST_Distance_Sphere(
+                                professional.location,
+                                ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)
+                              ) <= :radius
+                              `
                 )
                 .andWhere("professional.isActive = true")
                 .andWhere("professional.availability = true")
@@ -540,36 +540,5 @@ export default class ProfessionalService extends Service {
         } catch (error) {
             return this.handleTypeormError(error);
         }
-    }
-
-    public async isProfileComplete(professionalId: string): Promise<boolean> {
-        const professional = await this.professionalRepo.findOne({
-            where: { id: professionalId }
-        });
-
-        if (!professional) return false;
-
-        // Required fields for a completed business profile
-        const requiredFields = [
-            'businessName',
-            'businessCategory',
-            'businessType',
-            'ninNumber',
-            'ninSlipUrl',
-            'firstName',
-            'lastName'
-        ];
-
-        for (const field of requiredFields) {
-            if (!professional[field as keyof Professional]) {
-                return false;
-            }
-        }
-
-        if (!professional.profilePicture || !professional.profilePicture.url) {
-            return false;
-        }
-
-        return true;
     }
 }

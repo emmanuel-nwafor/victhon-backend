@@ -1,4 +1,4 @@
-import {Router, Request, Response} from 'express';
+import { Router, Request, Response } from 'express';
 import asyncHandler from "express-async-handler";
 import Controller from "../controllers/Booking";
 import {

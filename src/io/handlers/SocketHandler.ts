@@ -1,17 +1,17 @@
-import {Server} from "socket.io";
-import {ISocket} from "../../types";
+import { Server } from "socket.io";
+import { ISocket } from "../../types";
 import logger from "../../config/logger";
-import {Namespaces, QueueEvents, QueueNames, UserType} from "../../types/constants";
+import { Namespaces, QueueEvents, QueueNames, UserType } from "../../types/constants";
 import Handler from "./Handler";
 import User from "../../services/User";
 import Professional from "../../services/Professional";
-import {AppDataSource} from "../../data-source";
+import { AppDataSource } from "../../data-source";
 import ChatParticipant from "../../entities/ChatParticipant";
-import Message, {MessageStatus} from "../../entities/MessageEntity";
-import {RabbitMQ} from "../../services/RabbitMQ";
+import Message, { MessageStatus } from "../../entities/MessageEntity";
+import { RabbitMQ } from "../../services/RabbitMQ";
 import OfflineNotification from "../../services/OfflineNotification";
 import Inbox from "../../services/Inbox";
-import {Not} from "typeorm";
+import { Not } from "typeorm";
 import ChatEntity from "../../entities/ChatEntity";
 
 
@@ -56,7 +56,7 @@ export default class SocketHandler {
         const socketId = socket.id;
         const userId = socket.locals.data.id;
         const userType = socket.locals.data.userType;
-        const {chatId} = data;
+        const { chatId } = data;
 
         if (!chatId) {
             return socket.emit(
@@ -76,7 +76,7 @@ export default class SocketHandler {
                 Handler.responseData(true, "Something went wrong")
             );
         } else {
-            socket.emit("entered-chat", Handler.responseData(false, "Entered chat", {chatId}));
+            socket.emit("entered-chat", Handler.responseData(false, "Entered chat", { chatId }));
             logger.info(`${userType}${userId} entered chat:${chatId}`);
         }
     }
@@ -85,7 +85,7 @@ export default class SocketHandler {
         const socketId = socket.id;
         const userId = socket.locals.data.id;
         const userType = socket.locals.data.userType;
-        const {chatId} = data;
+        const { chatId } = data;
 
         if (!chatId) {
             return socket.emit(
@@ -105,7 +105,7 @@ export default class SocketHandler {
                 Handler.responseData(true, "Something went wrong")
             );
         } else {
-            socket.emit("left-chat", Handler.responseData(false, "Left chat", {chatId}));
+            socket.emit("left-chat", Handler.responseData(false, "Left chat", { chatId }));
             logger.info(`${userType}${userId} left chat:${chatId}`);
         }
     }
@@ -124,17 +124,17 @@ export default class SocketHandler {
             );
         }
 
-        const {receiverId, content, chatId} = data;
+        const { receiverId, content, chatId } = data;
 
         try {
             let where = {}
 
             const receiverType = senderType == UserType.PROFESSIONAL ? UserType.USER : UserType.PROFESSIONAL;
 
-            if (receiverType == UserType.PROFESSIONAL) where = {professional: {id: receiverId}, chat: {id: chatId}};
-            if (receiverType == UserType.USER) where = {chat: {id: chatId}, user: {id: receiverId}};
+            if (receiverType == UserType.PROFESSIONAL) where = { professional: { id: receiverId }, chat: { id: chatId } };
+            if (receiverType == UserType.USER) where = { chat: { id: chatId }, user: { id: receiverId } };
 
-            const chatParticipant = await SocketHandler.chatParticipantsRepo.findOne({where, relations: ["chat"],});
+            const chatParticipant = await SocketHandler.chatParticipantsRepo.findOne({ where, relations: ["chat"], });
 
             if (!chatParticipant) {
                 socket.emit("appError", Handler.responseData(true, "Chat does not exist,create a chat first"));
@@ -158,7 +158,7 @@ export default class SocketHandler {
             if (created) {
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_MESSAGE, {
                     eventType: QueueEvents.CHAT_RECEIVE_MESSAGE,
-                    payload: {newMessage, receiverId, receiverType, senderId},
+                    payload: { newMessage, receiverId, receiverType, senderId },
                 });
             }
         } catch (error) {
@@ -175,7 +175,7 @@ export default class SocketHandler {
         const userId = socket.locals.data.id;
         const userType = socket.locals.data.userType;
 
-        const {chatId} = data;
+        const { chatId } = data;
 
         try {
             if (!chatId) {
@@ -241,7 +241,7 @@ export default class SocketHandler {
             logger.info(`${userType}:${userId} is typing in chat:${chatId}`);
 
             if (socketId) {
-                socketNamespace.to(socketId).emit("typing", {chatId});
+                socketNamespace.to(socketId).emit("typing", { chatId });
             }
         } catch (error) {
             console.error("typing error:", error);
@@ -257,7 +257,7 @@ export default class SocketHandler {
         const userId = socket.locals.data.id;
         const userType = socket.locals.data.userType;
 
-        const {chatId} = data;
+        const { chatId } = data;
 
         try {
             if (!chatId) {
@@ -298,7 +298,7 @@ export default class SocketHandler {
 
 
             const updated = await SocketHandler.messageRepo.update({
-                chat: {id: chatId},
+                chat: { id: chatId },
                 status: MessageStatus.DELIVERED,
                 receiverId: userId,
                 receiverType: userType
@@ -308,10 +308,10 @@ export default class SocketHandler {
 
             await AppDataSource.getRepository(ChatParticipant).update(
                 {
-                    chat: {id: chatId}, // assume all messages from same chat
+                    chat: { id: chatId }, // assume all messages from same chat
                     ...(userType === UserType.USER
-                        ? {userId}
-                        : {professionalId: userId}),
+                        ? { userId }
+                        : { professionalId: userId }),
                 },
                 {
                     unreadCount: 0,
@@ -319,7 +319,7 @@ export default class SocketHandler {
                 }
             );
 
-            socket.emit("read", Handler.responseData(false, "Messages read", {chat}));
+            socket.emit("read", Handler.responseData(false, "Messages read", { chat }));
 
 
             if (updated.affected && updated.affected > 0) {
@@ -327,7 +327,7 @@ export default class SocketHandler {
 
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_MARK_AS_READ, {
                     eventType: QueueEvents.CHAT_MARK_AS_READ,
-                    payload: {chat, userType},
+                    payload: { chat, userType },
                 });
             } else {
                 logger.info(`👎 No messages for chat:${chatId} to update`);
@@ -347,7 +347,7 @@ export default class SocketHandler {
         const userId = socket.locals.data.id;
         const userType = socket.locals.data.userType;
 
-        const {messageIds} = data;
+        const { messageIds } = data;
 
         try {
             if (!messageIds || !messageIds.length) {
@@ -361,7 +361,7 @@ export default class SocketHandler {
 
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_MARK_AS_READ, {
                     eventType: QueueEvents.CHAT_MARK_AS_READ,
-                    payload: {chunk, userId, userType},
+                    payload: { chunk, userId, userType },
                 });
             }
 
@@ -387,7 +387,7 @@ export default class SocketHandler {
             );
         }
 
-        const {messageId, content} = data;
+        const { messageId, content } = data;
 
         try {
             const message = await SocketHandler.messageRepo.findOne({
@@ -424,7 +424,7 @@ export default class SocketHandler {
         const userId = socket.locals.data.id;
         const userType = socket.locals.data.userType;
 
-        const {messageIds} = data;
+        const { messageIds } = data;
 
         try {
             if (!messageIds || !messageIds.length) {
@@ -438,7 +438,7 @@ export default class SocketHandler {
 
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_DELETE_MESSAGES, {
                     eventType: QueueEvents.CHAT_DELETE_MESSAGES,
-                    payload: {chunk, userId, userType},
+                    payload: { chunk, userId, userType },
                 });
             }
 
@@ -466,52 +466,6 @@ export default class SocketHandler {
             logger.info(`👋 ${userType}:${userId} with the socket id - ${socket.id} has disconnected.`);
         } catch (error) {
             console.error("❌ Error in disconnect:", error);
-        }
-    }
-
-    public static async updateLocation(io: Server, socket: ISocket, data: any) {
-        const { bookingId, latitude, longitude } = data;
-        const professionalId = socket.locals.data.id;
-        const userType = socket.locals.data.userType;
-
-        if (userType !== UserType.PROFESSIONAL) {
-            return socket.emit("appError", Handler.responseData(true, "Unauthorized"));
-        }
-
-        if (!bookingId || !latitude || !longitude) {
-            return socket.emit("appError", Handler.responseData(true, "Invalid location payload"));
-        }
-
-        try {
-            const bookingRepo = AppDataSource.getRepository(require("../../entities/Booking").Booking);
-            const booking = await bookingRepo.findOne({
-                where: { id: bookingId, professionalId: professionalId },
-                relations: ["user"]
-            });
-
-            if (!booking) {
-                return socket.emit("appError", Handler.responseData(true, "Booking not found"));
-            }
-
-            const BookingStatus = require("../../entities/Booking").BookingStatus;
-            if (booking.status !== BookingStatus.ON_THE_WAY) {
-                return socket.emit("appError", Handler.responseData(true, "Live tracking is only active when you are on the way."));
-            }
-
-            // Get customer socket ID
-            const customerSocketId = await SocketHandler.userService.getSocketId(booking.userId);
-
-            if (customerSocketId) {
-                const socketNamespace = io.of(Namespaces.BASE);
-                socketNamespace.to(customerSocketId).emit("location-updated", {
-                    bookingId,
-                    latitude,
-                    longitude
-                });
-                logger.info(`📍 Location update sent for booking:${bookingId} to customer:${booking.userId}`);
-            }
-        } catch (error) {
-            console.error("updateLocation error:", error);
         }
     }
 }
