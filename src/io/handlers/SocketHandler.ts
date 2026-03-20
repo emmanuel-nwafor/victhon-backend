@@ -468,4 +468,50 @@ export default class SocketHandler {
             console.error("❌ Error in disconnect:", error);
         }
     }
+
+    public static async updateLocation(io: Server, socket: ISocket, data: any) {
+        const { bookingId, latitude, longitude } = data;
+        const professionalId = socket.locals.data.id;
+        const userType = socket.locals.data.userType;
+
+        if (userType !== UserType.PROFESSIONAL) {
+            return socket.emit("appError", Handler.responseData(true, "Unauthorized"));
+        }
+
+        if (!bookingId || !latitude || !longitude) {
+            return socket.emit("appError", Handler.responseData(true, "Invalid location payload"));
+        }
+
+        try {
+            const bookingRepo = AppDataSource.getRepository(require("../../entities/Booking").Booking);
+            const booking = await bookingRepo.findOne({
+                where: { id: bookingId, professionalId: professionalId },
+                relations: ["user"]
+            });
+
+            if (!booking) {
+                return socket.emit("appError", Handler.responseData(true, "Booking not found"));
+            }
+
+            const BookingStatus = require("../../entities/Booking").BookingStatus;
+            if (booking.status !== BookingStatus.ON_THE_WAY) {
+                return socket.emit("appError", Handler.responseData(true, "Live tracking is only active when you are on the way."));
+            }
+
+            // Get customer socket ID
+            const customerSocketId = await SocketHandler.userService.getSocketId(booking.userId);
+
+            if (customerSocketId) {
+                const socketNamespace = io.of(Namespaces.BASE);
+                socketNamespace.to(customerSocketId).emit("location-updated", {
+                    bookingId,
+                    latitude,
+                    longitude
+                });
+                logger.info(`📍 Location update sent for booking:${bookingId} to customer:${booking.userId}`);
+            }
+        } catch (error) {
+            console.error("updateLocation error:", error);
+        }
+    }
 }

@@ -10,11 +10,11 @@ import {
     JoinTable,
     ManyToMany, OneToMany, OneToOne,
 } from "typeorm";
-import {Geometry, User} from "./User";
-import {Professional} from "./Professional";
-import {UserType} from "../types/constants";
-import {ServiceEntity} from "./ServiceEntity";
-import {Escrow} from "./Escrow";
+import { Geometry, User } from "./User";
+import { Professional } from "./Professional";
+import { UserType } from "../types/constants";
+import { ServiceEntity } from "./ServiceEntity";
+import { Escrow } from "./Escrow";
 
 export enum BookingStatus {
     PENDING = "pending",
@@ -23,7 +23,8 @@ export enum BookingStatus {
     CANCELLED = "cancelled",
     REJECTED = "rejected",
     REVIEW = "review",
-    DISPUTED = "disputed"
+    DISPUTED = "disputed",
+    ON_THE_WAY = "on_the_way"
 }
 
 export enum PaymentStatus {
@@ -31,34 +32,34 @@ export enum PaymentStatus {
     PAID = "paid"
 }
 
-@Entity({name: "bookings"})
+@Entity({ name: "bookings" })
 export class Booking {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
-    @Column({nullable: true}) // because ON DELETE SET NULL
+    @Column({ nullable: true }) // because ON DELETE SET NULL
     userId: string;
 
-    @ManyToOne(() => User, {onDelete: "SET NULL"})
+    @ManyToOne(() => User, { onDelete: "SET NULL" })
     user: User;
 
     @Column()
     professionalId: string;
 
-    @ManyToOne(() => Professional, {onDelete: "CASCADE"})
+    @ManyToOne(() => Professional, { onDelete: "CASCADE" })
     professional: Professional;
 
     @ManyToMany(() => ServiceEntity, (v) => v.bookings)
     @JoinTable() // owner side adds join table
     services: ServiceEntity[];
 
-    @Column({type: 'varchar', length: 100, nullable: true})
+    @Column({ type: 'varchar', length: 100, nullable: true })
     address: string;
 
-    @Column({name: 'start_datetime', type: 'datetime', precision: 3})
+    @Column({ name: 'start_datetime', type: 'datetime', precision: 3 })
     startDateTime!: Date;
 
-    @Column({name: 'end_datetime', type: 'datetime', precision: 3})
+    @Column({ name: 'end_datetime', type: 'datetime', precision: 3 })
     endDateTime!: Date;
 
     @Column({
@@ -68,7 +69,7 @@ export class Booking {
     })
     status: BookingStatus;
 
-    @OneToOne(() => Escrow, escrow => escrow.booking,{
+    @OneToOne(() => Escrow, escrow => escrow.booking, {
         cascade: true,
         eager: true,
     })
@@ -82,10 +83,10 @@ export class Booking {
     })
     cancelledBy: UserType;
 
-    @Column({type: 'decimal', precision: 10, scale: 2})
+    @Column({ type: 'decimal', precision: 10, scale: 2 })
     amount: number;
 
-    @Column({type: 'text', nullable: true })
+    @Column({ type: 'text', nullable: true })
     notes: string;
 
     @CreateDateColumn()

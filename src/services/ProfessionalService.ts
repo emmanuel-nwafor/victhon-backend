@@ -1,11 +1,11 @@
-import {AppDataSource} from "../data-source";
-import {PhotoField, Professional} from "../entities/Professional";
-import {CdnFolders, HttpStatus, ResourceType} from "../types/constants";
+import { AppDataSource } from "../data-source";
+import { PhotoField, Professional } from "../entities/Professional";
+import { CdnFolders, HttpStatus, ResourceType } from "../types/constants";
 import Service from "./Service";
-import {ServiceEntity} from "../entities/ServiceEntity";
-import {DeepPartial} from "typeorm";
+import { ServiceEntity } from "../entities/ServiceEntity";
+import { DeepPartial } from "typeorm";
 import Cloudinary from "./Cloudinary";
-import {FailedFiles, UploadedFiles} from "../types";
+import { FailedFiles, UploadedFiles } from "../types";
 import deleteFiles from "../utils/deleteFiles";
 
 interface ServiceSearchOptions {
@@ -31,7 +31,7 @@ export default class ProfessionalService extends Service {
     public async add(payload: any) {
         try {
 
-            let professional = await this.professionalRepo.findOne({where: {id: payload.userId}});
+            let professional = await this.professionalRepo.findOne({ where: { id: payload.userId } });
             if (!professional) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
             let images: { url: string, publicId: string }[] = [];
@@ -47,7 +47,7 @@ export default class ProfessionalService extends Service {
                 } = await cloudinary.uploadV2(payload.files, ResourceType.IMAGE, CdnFolders.SERVICES));
                 if (failedFiles?.length > 0) return this.responseData(500, true, "File uploads failed", failedFiles);
 
-                images = uploadedFiles.map((upload) => ({url: upload.url, publicId: upload.publicId}));
+                images = uploadedFiles.map((upload) => ({ url: upload.url, publicId: upload.publicId }));
             }
 
 
@@ -84,11 +84,11 @@ export default class ProfessionalService extends Service {
             const professionalRepo = AppDataSource.getRepository(Professional);
             const relations = includeProfile ? ['professional'] : undefined;
 
-            let user = await professionalRepo.findOne({where: {id: userId}});
+            let user = await professionalRepo.findOne({ where: { id: userId } });
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
             const result = await this.repo.findOne({
-                where: {id, professionalId: userId},
+                where: { id, professionalId: userId },
                 relations: includeProfile ? ['professional'] : []
             });
             if (!result) return this.responseData(HttpStatus.NOT_FOUND, true, "Service not found.");
@@ -104,10 +104,10 @@ export default class ProfessionalService extends Service {
             const skip = (page - 1) * limit;
 
             const [records, total] = await this.repo.findAndCount({
-                where: {professionalId: professionalId},
+                where: { professionalId: professionalId },
                 skip,
                 take: limit,
-                order: {updatedAt: "DESC"},
+                order: { updatedAt: "DESC" },
             });
 
             const data = {
@@ -128,7 +128,7 @@ export default class ProfessionalService extends Service {
             const [records, total] = await this.repo.findAndCount({
                 skip,
                 take: limit,
-                order: {updatedAt: "DESC"},
+                order: { updatedAt: "DESC" },
             });
 
             const data = {
@@ -181,29 +181,29 @@ export default class ProfessionalService extends Service {
                 // 1️⃣ Spatial index filter (FAST)
                 .where(
                     `
-                              MBRContains(
-                                ST_GeomFromText(
-                                  'POLYGON((
-                                    ${minLng} ${minLat},
-                                    ${maxLng} ${minLat},
-                                    ${maxLng} ${maxLat},
-                                    ${minLng} ${maxLat},
-                                    ${minLng} ${minLat}
-                                  ))',
-                                  4326
-                                ),
-                                professional.location
-                              )
-                              `
+                               MBRContains(
+                                 ST_GeomFromText(
+                                   'POLYGON((
+                                     ${minLng} ${minLat},
+                                     ${maxLng} ${minLat},
+                                     ${maxLng} ${maxLat},
+                                     ${minLng} ${maxLat},
+                                     ${minLng} ${minLat}
+                                   ))',
+                                   4326
+                                 ),
+                                 professional.location
+                               )
+                               `
                 )
                 // 2️⃣ Accurate distance filter
                 .andWhere(
                     `
-                              ST_Distance_Sphere(
-                                professional.location,
-                                ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)
-                              ) <= :radius
-                              `
+                               ST_Distance_Sphere(
+                                 professional.location,
+                                 ST_GeomFromText('POINT(${longitude} ${latitude})', 4326)
+                               ) <= :radius
+                               `
                 )
                 .andWhere("professional.isActive = true")
                 .andWhere("professional.availability = true")
@@ -261,32 +261,32 @@ export default class ProfessionalService extends Service {
 
             // Dynamic filters: only add them if present
             if (name) {
-                query.orWhere("service.name LIKE :name", {name: `%${name}%`});
+                query.orWhere("service.name LIKE :name", { name: `%${name}%` });
             }
 
             if (category) {
-                query.orWhere("service.category LIKE :category", {category: `%${category}%`});
+                query.orWhere("service.category LIKE :category", { category: `%${category}%` });
             }
 
             if (description) {
-                query.orWhere("service.description LIKE :description", {description: `%${description}%`});
+                query.orWhere("service.description LIKE :description", { description: `%${description}%` });
             }
 
             // Price range filter
             if (minPrice !== undefined) {
-                query.andWhere("service.price >= :minPrice", {minPrice});
+                query.andWhere("service.price >= :minPrice", { minPrice });
             }
             if (maxPrice !== undefined) {
-                query.andWhere("service.price <= :maxPrice", {maxPrice});
+                query.andWhere("service.price <= :maxPrice", { maxPrice });
             }
 
             // Service type filters
-            if (remote !== undefined) query.andWhere("service.remoteLocationService = :remote", {remote});
-            if (onsite !== undefined) query.andWhere("service.onsiteLocationService = :onsite", {onsite});
-            if (store !== undefined) query.andWhere("service.storeLocationService = :store", {store});
+            if (remote !== undefined) query.andWhere("service.remoteLocationService = :remote", { remote });
+            if (onsite !== undefined) query.andWhere("service.onsiteLocationService = :onsite", { onsite });
+            if (store !== undefined) query.andWhere("service.storeLocationService = :store", { store });
 
             // Filter by professional
-            if (professionalId) query.andWhere("service.professionalId = :professionalId", {professionalId});
+            if (professionalId) query.andWhere("service.professionalId = :professionalId", { professionalId });
 
             // Pagination
             const offset = (page - 1) * limit;
@@ -335,7 +335,7 @@ export default class ProfessionalService extends Service {
             .filter((result) => !result.success)
             .map((result) => result.publicId);
 
-        return {success, failed};
+        return { success, failed };
     }
 
     public async updateServiceImages(
@@ -350,7 +350,7 @@ export default class ProfessionalService extends Service {
 
         try {
             const professionalService = await this.repo.findOne({
-                where: {id: serviceId, professionalId}
+                where: { id: serviceId, professionalId }
             });
 
             if (!professionalService) return this.responseData(404, true, "Service not found");
@@ -424,7 +424,7 @@ export default class ProfessionalService extends Service {
         try {
             if (files.length < 1) return this.responseData(400, false, "No files found.");
 
-            const professionalService = await this.repo.findOne({where: {id: serviceId, professionalId}});
+            const professionalService = await this.repo.findOne({ where: { id: serviceId, professionalId } });
             if (!professionalService) return this.responseData(404, true, "Service not found.");
 
             const cloudinary = new Cloudinary();
@@ -460,7 +460,7 @@ export default class ProfessionalService extends Service {
                 } = await cloudinary.uploadV2(files, ResourceType.IMAGE, CdnFolders.SERVICES));
                 if (failedFiles?.length > 0) return this.responseData(500, true, "File uploads failed", failedFiles);
 
-                images = uploadedFiles.map((upload) => ({url: upload.url, publicId: upload.publicId}));
+                images = uploadedFiles.map((upload) => ({ url: upload.url, publicId: upload.publicId }));
             }
 
             if (images?.length > 0) {
@@ -490,15 +490,15 @@ export default class ProfessionalService extends Service {
         try {
             const professionalRepo = AppDataSource.getRepository(Professional);
 
-            let user = await professionalRepo.findOne({where: {id: payload.professionalId}});
+            let user = await professionalRepo.findOne({ where: { id: payload.professionalId } });
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
-            const existing = await this.repo.findOne({where: {id: payload.id, professionalId: payload.professionalId}});
+            const existing = await this.repo.findOne({ where: { id: payload.id, professionalId: payload.professionalId } });
             if (!existing) {
                 return this.responseData(HttpStatus.NOT_FOUND, true, "Service not found.");
             }
 
-            await this.repo.update({id: payload.id, professionalId: payload.professionalId}, {
+            await this.repo.update({ id: payload.id, professionalId: payload.professionalId }, {
                 name: payload.name ?? existing.name,
                 description: payload.description ?? existing.description,
                 category: payload.category ?? existing.category,
@@ -523,10 +523,10 @@ export default class ProfessionalService extends Service {
         try {
             const professionalRepo = AppDataSource.getRepository(Professional);
 
-            let user = await professionalRepo.findOne({where: {id: userId}});
+            let user = await professionalRepo.findOne({ where: { id: userId } });
             if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
-            const professionalService = await this.repo.findOne({where: {id: id, professionalId: userId}});
+            const professionalService = await this.repo.findOne({ where: { id: id, professionalId: userId } });
 
             if (!professionalService) return this.responseData(HttpStatus.NOT_FOUND, true, `Service was not found.`);
 
@@ -534,11 +534,42 @@ export default class ProfessionalService extends Service {
 
             if (publicIds.length > 0) await (new Cloudinary()).deleteFiles(publicIds);
 
-            await this.repo.delete({professionalId: userId, id})
+            await this.repo.delete({ professionalId: userId, id })
             return this.responseData(HttpStatus.OK, false, `Service was deleted successfully.`);
 
         } catch (error) {
             return this.handleTypeormError(error);
         }
+    }
+
+    public async isProfileComplete(professionalId: string): Promise<boolean> {
+        const professional = await this.professionalRepo.findOne({
+            where: { id: professionalId }
+        });
+
+        if (!professional) return false;
+
+        // Required fields for a completed business profile
+        const requiredFields = [
+            'businessName',
+            'businessCategory',
+            'businessType',
+            'ninNumber',
+            'ninSlipUrl',
+            'firstName',
+            'lastName'
+        ];
+
+        for (const field of requiredFields) {
+            if (!professional[field as keyof Professional]) {
+                return false;
+            }
+        }
+
+        if (!professional.profilePicture || !professional.profilePicture.url) {
+            return false;
+        }
+
+        return true;
     }
 }

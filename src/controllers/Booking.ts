@@ -47,6 +47,15 @@ export default class Booking {
         Controller.response(res, serviceResult);
     }
 
+    public static async startMoving(req: Request, res: Response) {
+        const {id: userId} = res.locals.data;
+        const {bookingId} = req.params;
+
+        const serviceResult = await Booking.service.startMoving(bookingId!, userId);
+
+        Controller.response(res, serviceResult);
+    }
+
     public static async reviewBooking(req: Request, res: Response) {
         const {id: userId} = res.locals.data;
         const {bookingId} = req.params;

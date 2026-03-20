@@ -27,6 +27,7 @@ booking.get("/schedules/:professionalId", bookings, asyncHandler(Controller.book
 
 booking.post("/", createBooking, asyncHandler(Controller.book));
 booking.patch("/accept/:bookingId", acceptBooking, asyncHandler(Controller.acceptBooking));
+booking.patch("/start-moving/:bookingId", acceptBooking, asyncHandler(Controller.startMoving));
 booking.patch("/reject/:bookingId", rejectBooking, asyncHandler(Controller.rejectBooking));
 booking.patch("/complete/:bookingId", completeBooking, asyncHandler(Controller.completeBooking));
 booking.patch("/review/:bookingId", reviewBooking, asyncHandler(Controller.reviewBooking));

@@ -55,6 +55,12 @@ export default class BookingService extends Service {
     if (!professional.availability)
       return this.responseData(400, true, "Professional is unavailable.");
 
+    // Check if professional profile is complete
+    const isProfileComplete = await this.isProfileComplete(professionalId);
+    if (!isProfileComplete) {
+        return this.responseData(HttpStatus.FORBIDDEN, true, "Professional has not completed their business profile setup.");
+    }
+
     let serviceExists = await this.serviceRepo.find({
       where: { id: In(serviceIds), professionalId: professionalId },
     });
@@ -278,7 +284,7 @@ export default class BookingService extends Service {
           id: bookingId,
           professionalId: proId,
         },
-        relations: ["user"],
+        relations: ["user", "services"],
       });
 
       if (!booking)
@@ -302,7 +308,7 @@ export default class BookingService extends Service {
           id: bookingId,
           userId: userId,
         },
-        relations: ["professional"],
+        relations: ["professional", "services"],
       });
 
       if (!booking)
@@ -331,6 +337,12 @@ export default class BookingService extends Service {
 
       if (!booking)
         return this.responseData(404, true, "Booking was not found");
+
+      // Check if professional profile is complete
+      const isProfileComplete = await this.isProfileComplete(proId);
+      if (!isProfileComplete) {
+          return this.responseData(HttpStatus.FORBIDDEN, true, "Professional has not completed their business profile setup.");
+      }
 
       if (booking.status !== BookingStatus.PENDING)
         return this.responseData(400, true, `This booking can't be accepted`);
@@ -445,6 +457,72 @@ export default class BookingService extends Service {
 
   public async cancelBooking(bookingId: string, userId: string) {
     return await new Payment().refundBooking(bookingId, userId);
+  }
+
+  public async startMoving(bookingId: string, proId: string) {
+    try {
+      const booking = await this.repo.findOne({
+        where: {
+          id: bookingId,
+          professionalId: proId,
+        },
+        relations: ["services", "user"],
+      });
+
+      if (!booking)
+        return this.responseData(404, true, "Booking was not found");
+
+      if (booking.status !== BookingStatus.ACCEPTED)
+        return this.responseData(400, true, "Booking must be accepted first.");
+
+      const hasOnsite = booking.services.some(s => s.onsiteLocationService);
+      if (!hasOnsite)
+        return this.responseData(400, true, "This service does not support live tracking.");
+
+      booking.status = BookingStatus.ON_THE_WAY;
+      const updatedBooking = await this.repo.save(booking);
+
+      await notify({
+        userId: booking.userId,
+        userType: UserType.USER,
+        type: NotificationType.BOOKING,
+        data: { ...updatedBooking, services: undefined },
+      });
+
+      return this.responseData(200, false, "Professional is now on the way.", updatedBooking);
+    } catch (error) {
+      return this.handleTypeormError(error);
+    }
+  }
+
+  private async isProfileComplete(professionalId: string): Promise<boolean> {
+    const professional = await this.professionalRepo.findOne({
+        where: { id: professionalId }
+    });
+
+    if (!professional) return false;
+
+    const requiredFields = [
+        'businessName',
+        'businessCategory',
+        'businessType',
+        'ninNumber',
+        'ninSlipUrl',
+        'firstName',
+        'lastName'
+    ];
+
+    for (const field of requiredFields) {
+        if (!professional[field as keyof Professional]) {
+            return false;
+        }
+    }
+
+    if (!professional.profilePicture || !professional.profilePicture.url) {
+        return false;
+    }
+
+    return true;
   }
 
   public async completeBooking(bookingId: string, userId: string) {
