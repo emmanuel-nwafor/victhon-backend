@@ -17,7 +17,9 @@ export default class Professional {
 
     public static async editProfessionalProfile(req: Request, res: Response) {
         let editData: EditProfessionalDto = req.body;
-        editData.file = req.file;
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+        editData.file = files?.image?.[0];
+        editData.businessLogo = files?.businessLogo?.[0];
         const { id: userId } = res.locals.data;
 
         const serviceResult = await Professional.service.editProfessionalProfile(userId, editData);

@@ -4,7 +4,10 @@ import uploads from "../multer";
 import { ResourceType } from "../../types/constants";
 
 export const editProfessionalValidator = [
-    uploads(ResourceType.IMAGE).single('image'),
+    uploads(ResourceType.IMAGE).fields([
+        { name: 'image', maxCount: 1 },
+        { name: 'businessLogo', maxCount: 1 },
+    ]),
     body("email")
         .optional()
         .isEmail()

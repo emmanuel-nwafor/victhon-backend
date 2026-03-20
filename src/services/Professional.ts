@@ -66,7 +66,7 @@ export default class Professional extends Service {
             if (!professional) return this.responseData(404, true, "Professional not found");
 
             /* --- Upload business logo --- */
-            let profilePicture = professional.profilePicture;
+            let businessLogo = professional.businessLogo ?? null;
             if (dto.logo) {
                 const { uploadedFiles, failedFiles } = await cloudinary.uploadV2(
                     [dto.logo],
@@ -79,11 +79,11 @@ export default class Professional extends Service {
                 }
 
                 // Delete the old logo from Cloudinary if it exists
-                if (professional.profilePicture?.publicId) {
-                    await cloudinary.delete(professional.profilePicture.publicId);
+                if (professional.businessLogo?.publicId) {
+                    await cloudinary.delete(professional.businessLogo.publicId);
                 }
 
-                profilePicture = {
+                businessLogo = {
                     url: uploadedFiles[0]!.url,
                     publicId: uploadedFiles[0]!.publicId,
                 };
@@ -113,7 +113,7 @@ export default class Professional extends Service {
                 businessType: dto.businessType,
                 ninNumber: dto.ninNumber,
                 ninSlipUrl: ninSlipUrl ?? undefined,
-                profilePicture: profilePicture!,
+                businessLogo: businessLogo!,
             });
 
             const updated = await this.repo.findOne({ where: { id: professionalId } });
@@ -165,6 +165,7 @@ export default class Professional extends Service {
             }
 
             let profilePicture = professional.profilePicture;
+            let businessLogo = professional.businessLogo;
 
             if (editData.file) {
                 const cloudinary = new Cloudinary();
@@ -177,17 +178,41 @@ export default class Professional extends Service {
                     );
 
                 if (failedFiles?.length) {
-                    return this.responseData(500, true, "Image upload failed", failedFiles);
+                    return this.responseData(500, true, "Profile image upload failed", failedFiles);
+                }
+
+                if (professional.profilePicture?.publicId) {
+                    await cloudinary.delete(professional.profilePicture.publicId);
                 }
 
                 profilePicture = {
                     url: uploadedFiles[0]!.url,
                     publicId: uploadedFiles[0]!.publicId
                 };
+            }
 
-                if (professional.profilePicture?.publicId) {
-                    await cloudinary.delete(professional.profilePicture.publicId);
+            if (editData.businessLogo) {
+                const cloudinary = new Cloudinary();
+
+                const { uploadedFiles, failedFiles } =
+                    await cloudinary.uploadV2(
+                        [editData.businessLogo],
+                        ResourceType.IMAGE,
+                        CdnFolders.PROFILEPICTURE
+                    );
+
+                if (failedFiles?.length) {
+                    return this.responseData(500, true, "Business logo upload failed", failedFiles);
                 }
+
+                if (professional.businessLogo?.publicId) {
+                    await cloudinary.delete(professional.businessLogo.publicId);
+                }
+
+                businessLogo = {
+                    url: uploadedFiles[0]!.url,
+                    publicId: uploadedFiles[0]!.publicId
+                };
             }
 
             let location = professional.location;
@@ -210,6 +235,7 @@ export default class Professional extends Service {
                 availability: editData.availability ?? professional.availability,
                 isActive: editData.isActive ?? professional.isActive,
                 profilePicture: profilePicture!,
+                businessLogo: businessLogo!,
                 location
             };
 
