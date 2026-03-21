@@ -83,6 +83,7 @@ export default class Chat extends Service {
             if (!receiver) return this.responseData(404, true, "Receiver not found");
 
             if (receiver) {
+                await this.repo.update(chatId, { updatedAt: new Date() }); // Refresh timestamp
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_SEND_ATTACHMENT, {
                     eventType: QueueEvents.CHAT_SEND_ATTACHMENT,
                     payload: {
@@ -248,6 +249,9 @@ export default class Chat extends Service {
                     participants: {
                         user: true,
                         professional: true
+                    },
+                    lastMessage: {
+                        attachments: true
                     }
                 }
             });

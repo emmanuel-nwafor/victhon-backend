@@ -156,7 +156,10 @@ export default class SocketHandler {
             logger.info(`📩 ${senderType}:${senderId} sent a message to ${receiverType}:${receiverId} successfully.`);
 
             if (created) {
-                await SocketHandler.chatRepo.update(chatId, { lastMessageId: created.id });
+                await SocketHandler.chatRepo.update(chatId, { 
+                    lastMessageId: created.id,
+                    updatedAt: new Date()
+                });
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_MESSAGE, {
                     eventType: QueueEvents.CHAT_RECEIVE_MESSAGE,
                     payload: { newMessage, receiverId, receiverType, senderId },

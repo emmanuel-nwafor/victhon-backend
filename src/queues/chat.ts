@@ -48,10 +48,6 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
 
             await AppDataSource.transaction(async (manager) => {
                 if (inChat) {
-                    await manager.update(Message, {
-                        id: newMessage.id,
-                    }, { status: MessageStatus.READ });
-
                     if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-read", { messageId: newMessage.id });
                 } else {
                     await manager.update(Message, {
@@ -69,6 +65,11 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                         1
                     );
                 }
+
+                await manager.update(ChatEntity, newMessage.chat.id, {
+                    lastMessageId: newMessage.id,
+                    updatedAt: new Date(),
+                });
             });
 
 
@@ -332,7 +333,10 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
         const createdMessage = await messageRepo.save(newMessage);
 
         if (createdMessage) {
-            await AppDataSource.getRepository(ChatEntity).update(chatId, { lastMessageId: createdMessage.id });
+            await AppDataSource.getRepository(ChatEntity).update(chatId, { 
+                lastMessageId: createdMessage.id,
+                updatedAt: new Date()
+            });
             await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_ATTACHMENT, {
                 eventType: QueueEvents.CHAT_RECEIVE_ATTACHMENT,
                 payload: { newMessage, receiverId, receiverType, senderId },
