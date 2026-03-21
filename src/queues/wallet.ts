@@ -29,7 +29,8 @@ const wallet = new RabbitMQRouter({
 
 wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
     const { escrowId, professionalId, walletId } = message.payload;
-    const platFormFeePercent = parseFloat(env(EnvKey.PLATFORM_FEE_PERCENT)!);
+    const rawFee = env(EnvKey.PLATFORM_FEE_PERCENT);
+    const platFormFeePercent = rawFee ? parseFloat(rawFee) : 0;
 
     try {
         const result = await AppDataSource.transaction(async manager => {
