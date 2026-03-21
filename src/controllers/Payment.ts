@@ -28,14 +28,16 @@ export default class Payment {
 
     public static async withdraw(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
-        const { accountId, amount } = req.body;
+        const { accountId, amount, bankCode, accountNumber, accountName } = req.body;
         const parsedAmount = parseFloat(amount) || null;
 
         if (!parsedAmount) {
             res.status(400).send({ error: true, message: 'Amount must be valid', data: {} });
             return;
         }
-        const serviceResult = await Payment.service.withdraw(userId, accountId, parsedAmount);
+
+        const accountDetails = (bankCode && accountNumber) ? { bankCode, accountNumber, accountName } : undefined;
+        const serviceResult = await Payment.service.withdraw(userId, accountId, parsedAmount, accountDetails);
         Controller.response(res, serviceResult);
     }
 

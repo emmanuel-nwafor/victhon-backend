@@ -14,7 +14,19 @@ export default class Wallet extends Service {
 
     public async wallet(userId: string) {
         try {
-            const result = await this.repo.findOne({where: {professionalId: userId}});
+            let result = await this.repo.findOne({where: {professionalId: userId}});
+            
+            if (!result) {
+                // Auto-create wallet if it doesn't exist
+                result = this.repo.create({
+                    professionalId: userId,
+                    balance: 0,
+                    pendingAmount: 0,
+                    totalBalance: 0
+                });
+                await this.repo.save(result);
+            }
+
             return this.responseData(200, false, "Wallet was retrieved successfully", result);
         } catch (error) {
             return this.handleTypeormError(error);

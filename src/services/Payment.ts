@@ -840,50 +840,117 @@ export default class Payment extends BaseService {
     return this.responseData(200, false, null);
   }
 
-  public async withdraw(userId: string, accountId: string, amount: number) {
+  public async withdraw(userId: string, accountId: string | undefined, amount: number, accountDetails?: any) {
     try {
-      const account = await this.accountRepo.findOne({
-        where: { id: accountId, professionalId: userId },
-        relations: ["professional", "professional.wallet"],
+      let bankCode, accountNumber, narration;
+
+      const wallet = await this.walletRepo.findOne({
+        where: { professionalId: userId }
       });
-
-      if (!account) return this.responseData(404, true, "Account not found");
-
-      const wallet = account.professional.wallet;
+      if (!wallet) return this.responseData(404, true, "Wallet not found");
 
       if (wallet.balance < amount)
         return this.responseData(400, true, "Insufficient balance");
-      if (amount < 10000)
+      if (amount < 100)
         return this.responseData(400, true, "Amount too low for withdrawal");
+
+      if (accountId) {
+          const account = await this.accountRepo.findOne({
+            where: { id: accountId, professionalId: userId },
+          });
+
+          if (!account) return this.responseData(404, true, "Account not found");
+          bankCode = account.bankCode;
+          accountNumber = account.accountNumber;
+          narration = `Withdrawal to ${account.name}`;
+      } else if (accountDetails) {
+          bankCode = accountDetails.bankCode;
+          accountNumber = accountDetails.accountNumber;
+          narration = `Withdrawal to ${accountDetails.accountName || "User"}`;
+      } else {
+          return this.responseData(400, true, "Bank details are required");
+      }
 
       const reference = `wd_${userId}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
-      const response = await this.flwClient.post("/transfers", {
-        account_bank: account.bankCode,
-        account_number: account.accountNumber,
-        amount: Math.round(amount), // NGN — not kobo
-        narration: `Withdrawal — Service Provider ${userId}`,
-        currency: "NGN",
-        reference,
-        debit_currency: "NGN",
+      // DB Transaction for local update
+      const result = await AppDataSource.transaction(async (manager) => {
+          // Lock wallet
+          const lockedWallet = await manager.findOne(Wallet, {
+              where: { id: wallet.id },
+              lock: { mode: "pessimistic_write" },
+          });
+
+          if (!lockedWallet || lockedWallet.balance < amount) {
+              throw new Error("Insufficient balance during processing");
+          }
+
+          // Deduct from balance
+          lockedWallet.balance = Number(lockedWallet.balance) - amount;
+          lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
+          await manager.save(lockedWallet);
+
+          // Create transaction record
+          const tx = manager.create(Transaction, {
+              professionalId: userId,
+              type: TransactionType.WITHDRAWAL,
+              status: TransactionStatus.PROCESSING,
+              amount: amount,
+              reference: reference,
+              wallet: lockedWallet
+          });
+          await manager.save(tx);
+          return { lockedWallet, tx };
       });
 
-      const transferData = response.data;
+      // Call Flutterwave API
+      try {
+          const response = await this.flwClient.post("/transfers", {
+              account_bank: bankCode,
+              account_number: accountNumber,
+              amount: Math.round(amount), // NGN
+              narration: narration,
+              currency: "NGN",
+              reference,
+              debit_currency: "NGN",
+          });
 
-      if (transferData?.status !== "success") {
-        return this.responseData(
-          500,
-          true,
-          transferData?.message ?? "Transfer initiation failed",
-        );
+          const transferData = response.data;
+
+          if (transferData?.status !== "success") {
+              throw new Error(transferData?.message ?? "Transfer initiation failed");
+          }
+
+          return this.responseData(
+              200,
+              false,
+              "Withdrawal initiated successfully",
+              transferData.data
+          );
+      } catch (flwError: any) {
+          logger.error("Flutterwave API failed", flwError.response?.data || flwError.message);
+          
+          await AppDataSource.transaction(async (manager) => {
+              const lockedWallet = await manager.findOne(Wallet, {
+                  where: { id: wallet.id },
+                  lock: { mode: "pessimistic_write" }
+              });
+              const failedTx = await manager.findOne(Transaction, { where: { id: result.tx.id }});
+              
+              if (lockedWallet && failedTx) {
+                  lockedWallet.balance = Number(lockedWallet.balance) + amount;
+                  lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
+                  failedTx.status = TransactionStatus.FAILED;
+                  await manager.save([lockedWallet, failedTx]);
+              }
+          });
+
+          return this.responseData(
+              500,
+              true,
+              "Transfer initiation failed. Please try again later."
+          );
       }
-
-      return this.responseData(
-        200,
-        false,
-        "Withdrawal initiated successfully",
-        transferData.data,
-      );
     } catch (error: any) {
       console.error("Withdrawal failed:", error);
       return this.handleTypeormError(error);

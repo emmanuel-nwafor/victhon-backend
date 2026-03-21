@@ -14,10 +14,10 @@ export const initializeValidator = [
 export const withdrawValidator = [
     verifyJWT([UserType.PROFESSIONAL]),
     body('accountId')
-        .exists().withMessage('Account ID is required')
+        .optional()
         .isUUID().withMessage('Account ID must be a valid id'),
     body('amount')
         .exists().withMessage('Amount is required')
-        .isNumeric().withMessage('Amount must be a positive integer'),
+        .isNumeric().withMessage('Amount must be a positive numeric value'),
     handleValidationErrors
 ];
