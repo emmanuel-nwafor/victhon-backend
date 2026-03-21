@@ -4,7 +4,9 @@ import {
     Column,
     CreateDateColumn,
     UpdateDateColumn,
-    OneToMany, OneToOne
+    OneToMany,
+    OneToOne,
+    JoinColumn
 } from "typeorm";
 import ChatParticipant from "./ChatParticipant";
 import Message from "./MessageEntity";
@@ -20,6 +22,13 @@ export default class ChatEntity {
 
     @OneToMany(() => Message, m => m.chat)
     messages: Message[];
+
+    @Column({ nullable: true })
+    lastMessageId: string;
+
+    @OneToOne(() => Message, { nullable: true, onDelete: "SET NULL" })
+    @JoinColumn({ name: "lastMessageId" })
+    lastMessage: Message;
 
     @CreateDateColumn()
     createdAt: Date;

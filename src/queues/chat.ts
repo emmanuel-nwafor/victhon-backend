@@ -15,6 +15,7 @@ import { RabbitMQ } from "../services/RabbitMQ";
 import Handler from "../io/handlers/Handler";
 import deleteFiles from "../utils/deleteFiles";
 import ChatParticipant from "../entities/ChatParticipant";
+import ChatEntity from "../entities/ChatEntity";
 import MessageAttachment from "../entities/MessageAttachment";
 import { exchange, FailedFiles, UploadedFiles } from "../types";
 import { AppDataSource } from "../data-source";
@@ -331,6 +332,7 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
         const createdMessage = await messageRepo.save(newMessage);
 
         if (createdMessage) {
+            await AppDataSource.getRepository(ChatEntity).update(chatId, { lastMessageId: createdMessage.id });
             await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_ATTACHMENT, {
                 eventType: QueueEvents.CHAT_RECEIVE_ATTACHMENT,
                 payload: { newMessage, receiverId, receiverType, senderId },

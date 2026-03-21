@@ -161,6 +161,7 @@ export default class Chat extends Service {
             const createdMessage = await this.messageRepo.save(newMessage);
 
             if (createdMessage) {
+                await this.repo.update(chatParticipant.chat.id, { lastMessageId: createdMessage.id });
                 await RabbitMQ.publishToExchange(QueueNames.CHAT, QueueEvents.CHAT_RECEIVE_ATTACHMENT, {
                     eventType: QueueEvents.CHAT_RECEIVE_ATTACHMENT,
                     payload: { newMessage, receiverId, receiverType, senderId },
@@ -289,7 +290,7 @@ export default class Chat extends Service {
                 .leftJoinAndSelect("participants.user", "user")
                 .leftJoinAndSelect("participants.professional", "professional")
 
-                // Filtering: Only show chats where the current user is a participant
+                // filtering: only show chats where the user is a participant
                 .innerJoin(
                     "chat.participants",
                     "filterParticipant",
@@ -299,13 +300,9 @@ export default class Chat extends Service {
                     { userId }
                 )
 
-                // ✅ NEW: Join the actual last message object
-                .leftJoinAndMapOne(
-                    "chat.lastMessage",
-                    Message,
-                    "lastMsg",
-                    "lastMsg.id = (SELECT m.id FROM messages m WHERE m.chatId = chat.id ORDER BY m.createdAt DESC LIMIT 1)"
-                )
+                // ✅ NEW: Join the actual last message relation
+                .leftJoinAndSelect("chat.lastMessage", "lastMessage")
+                .leftJoinAndSelect("lastMessage.attachments", "lastMessageAttachments")
 
                 // Keep your ordering logic
                 .addSelect(subQuery => {
