@@ -19,8 +19,8 @@ paymentRouter.get('/flw/callback', (req, res) => {
         </html>
     `);
 });
-paymentRouter.get('/verify/:reference',verifyJWT([UserType.USER]), asyncHandler(Controller.verifyFlwTransaction));
-paymentRouter.post('/withdraw',withdrawValidator, asyncHandler(Controller.withdraw));
+paymentRouter.get('/verify/:reference', verifyJWT([UserType.USER]), asyncHandler(Controller.verifyFlwTransaction));
+paymentRouter.post('/withdraw', withdrawValidator, asyncHandler(Controller.withdraw));
 
 
 // paymentRouter.get('/booking/verify/:bookingId', initializeValidator, asyncHandler(verifyBookingTransaction));

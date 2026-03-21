@@ -119,4 +119,8 @@ export const bookings = [
     handleValidationErrors
 ];
 
-export const disputeBooking = [...completeBooking];
+export const disputeBooking = [
+    ...completeBooking,
+    body("reason").optional().isString().withMessage("Reason must be a valid string"),
+    handleValidationErrors
+];

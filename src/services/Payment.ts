@@ -490,7 +490,7 @@ export default class Payment extends BaseService {
     }
   }
 
-  public async dispute(bookingId: string) {
+  public async dispute(bookingId: string, reason?: string) {
     try {
       const result = await AppDataSource.transaction(async (manager) => {
         const transactionRepo = manager.getRepository(Transaction);
@@ -543,7 +543,7 @@ export default class Payment extends BaseService {
         const newDispute = disputeRepo.create({
           transaction: transaction,
           amount: transaction.amount,
-          reason: "Dispute initiated",
+          reason: reason || "Dispute initiated",
         });
 
         escrow.status = EscrowStatus.DISPUTED;

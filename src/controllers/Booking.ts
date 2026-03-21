@@ -135,8 +135,9 @@ export default class Booking {
     public static async disputeBooking(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
         const { bookingId } = req.params;
+        const { reason } = req.body;
 
-        const serviceResult = await Booking.service.disputeBooking(bookingId!, userId);
+        const serviceResult = await Booking.service.disputeBooking(bookingId!, userId, reason);
 
         Controller.response(res, serviceResult);
     }

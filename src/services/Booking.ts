@@ -423,7 +423,7 @@ export default class BookingService extends Service {
                 return this.responseData(404, true, "Booking was not found");
 
             if (
-                ![BookingStatus.ACCEPTED, BookingStatus.REVIEW].includes(booking.status)
+                ![BookingStatus.ACCEPTED, BookingStatus.REVIEW, BookingStatus.ON_THE_WAY].includes(booking.status)
             )
                 return this.responseData(
                     400,
@@ -541,9 +541,9 @@ export default class BookingService extends Service {
                     throw new Error("Booking not found");
                 }
 
-                // Allow completion from either REVIEW or ACCEPTED status
+                // Allow completion from REVIEW, ACCEPTED, or ON_THE_WAY status
                 if (
-                    ![BookingStatus.REVIEW, BookingStatus.ACCEPTED].includes(
+                    ![BookingStatus.REVIEW, BookingStatus.ACCEPTED, BookingStatus.ON_THE_WAY].includes(
                         booking.status,
                     )
                 ) {
@@ -676,7 +676,7 @@ export default class BookingService extends Service {
         }
     }
 
-    public async disputeBooking(bookingId: string, userId: string) {
+    public async disputeBooking(bookingId: string, userId: string, reason?: string) {
         try {
             const booking = await this.repo.findOne({
                 where: { id: bookingId, userId },
@@ -697,7 +697,7 @@ export default class BookingService extends Service {
 
             // Payment service handles the heavy lifting of updates to escrow, transactions, and wallet
             const paymentService = new Payment();
-            const result = await paymentService.dispute(booking.id);
+            const result = await paymentService.dispute(booking.id, reason);
 
             if (!result) {
                 return this.responseData(HttpStatus.INTERNAL_SERVER_ERROR, true, "Could not process dispute");
