@@ -1,3 +1,4 @@
+import { In } from "typeorm";
 import { AppDataSource } from "../data-source";
 import ChatEntity from "../entities/ChatEntity";
 import Service from "./Service";
