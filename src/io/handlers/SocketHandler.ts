@@ -472,4 +472,34 @@ export default class SocketHandler {
             console.error("❌ Error in disconnect:", error);
         }
     }
+
+    public static async updateLocation(io: Server, socket: ISocket, data: any) {
+        const { bookingId, latitude, longitude } = data;
+        if (!bookingId || !latitude || !longitude) {
+            return socket.emit("appError", Handler.responseData(true, "Invalid location payload"));
+        }
+
+        const socketNamespace = io.of(Namespaces.BASE);
+        logger.info(`📍 Location update for booking ${bookingId}: ${latitude}, ${longitude}`);
+        
+        // Broadcast to everyone in the booking room
+        socketNamespace.to(`booking_${bookingId}`).emit("location-updated", {
+            bookingId,
+            latitude,
+            longitude,
+            timestamp: new Date()
+        });
+    }
+
+    public static async joinBooking(io: Server, socket: ISocket, data: any) {
+        const { bookingId } = data;
+        if (!bookingId) {
+            return socket.emit("appError", Handler.responseData(true, "Booking ID required"));
+        }
+
+        const room = `booking_${bookingId}`;
+        socket.join(room);
+        logger.info(`👤 ${socket.id} joined room ${room}`);
+        socket.emit("joined-booking", Handler.responseData(false, "Joined booking room", { bookingId }));
+    }
 }
