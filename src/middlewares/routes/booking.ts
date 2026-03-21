@@ -1,7 +1,7 @@
-import {body, param, query} from "express-validator";
-import {handleValidationErrors} from "../validators";
+import { body, param, query } from "express-validator";
+import { handleValidationErrors } from "../validators";
 import verifyJWT from "../verifyJWT";
-import {UserType} from "../../types/constants";
+import { UserType } from "../../types/constants";
 
 export const createBooking = [
     verifyJWT([UserType.USER]),
@@ -12,13 +12,13 @@ export const createBooking = [
 
     // packageId UUID
     body("serviceIds")
-        .isArray({min: 1})
+        .isArray({ min: 1 })
         .withMessage("serviceId must be a non-empty array"),
 
     body('address')
         .optional()
         .isString().withMessage('Address must be a string')
-        .isLength({min: 3}).withMessage('Address must be at least 3 characters'),
+        .isLength({ min: 3 }).withMessage('Address must be at least 3 characters'),
 
     body("serviceIds.*")
         .isUUID()
@@ -46,7 +46,7 @@ export const createBooking = [
         }),
 
     // Ensure endDateTime > startDateTime
-    body("endDateTime").custom((value, {req}) => {
+    body("endDateTime").custom((value, { req }) => {
         const start = new Date(req.body.startDateTime);
         const end = new Date(value);
         if (end <= start) {
@@ -97,15 +97,15 @@ export const getUserBooking = [
 
 export const proBookings = [
     verifyJWT([UserType.PROFESSIONAL]),
-    query('page').optional().isInt({min: 1}).withMessage("page must be an integer"),
-    query('limit').optional().isInt({min: 1}).withMessage("limit must be an integer"),
+    query('page').optional().isInt({ min: 1 }).withMessage("page must be an integer"),
+    query('limit').optional().isInt({ min: 1 }).withMessage("limit must be an integer"),
     handleValidationErrors
 ];
 
 export const userBookings = [
     verifyJWT([UserType.USER]),
-    query('page').optional().isInt({min: 1}).withMessage("page must be an integer"),
-    query('limit').optional().isInt({min: 1}).withMessage("limit must be an integer"),
+    query('page').optional().isInt({ min: 1 }).withMessage("page must be an integer"),
+    query('limit').optional().isInt({ min: 1 }).withMessage("limit must be an integer"),
     handleValidationErrors
 ];
 
@@ -114,7 +114,9 @@ export const bookings = [
     param("professionalId")
         .notEmpty().withMessage("professionalId is required")
         .isUUID().withMessage("professionalId must be a valid UUID"),
-    query('page').optional().isInt({min: 1}).withMessage("page must be an integer"),
-    query('limit').optional().isInt({min: 1}).withMessage("limit must be an integer"),
+    query('page').optional().isInt({ min: 1 }).withMessage("page must be an integer"),
+    query('limit').optional().isInt({ min: 1 }).withMessage("limit must be an integer"),
     handleValidationErrors
 ];
+
+export const disputeBooking = [...completeBooking];

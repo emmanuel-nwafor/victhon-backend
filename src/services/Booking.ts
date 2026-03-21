@@ -675,4 +675,65 @@ export default class BookingService extends Service {
             return this.handleTypeormError(error);
         }
     }
+
+    public async disputeBooking(bookingId: string, userId: string) {
+        try {
+            const booking = await this.repo.findOne({
+                where: { id: bookingId, userId },
+                relations: ["escrow"],
+            });
+
+            if (!booking) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "Booking not found");
+            }
+
+            if (booking.status !== BookingStatus.REVIEW && booking.status !== BookingStatus.ACCEPTED && booking.status !== BookingStatus.ON_THE_WAY) {
+                return this.responseData(HttpStatus.BAD_REQUEST, true, "Booking cannot be disputed at this stage");
+            }
+
+            if (booking.escrow.status !== EscrowStatus.PAID) {
+                return this.responseData(HttpStatus.BAD_REQUEST, true, "Booking has not been paid yet");
+            }
+
+            // Payment service handles the heavy lifting of updates to escrow, transactions, and wallet
+            const paymentService = new Payment();
+            const result = await paymentService.dispute(booking.id);
+
+            if (!result) {
+                return this.responseData(HttpStatus.INTERNAL_SERVER_ERROR, true, "Could not process dispute");
+            }
+
+            return this.responseData(HttpStatus.OK, false, "Booking has been disputed successfully", result);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async autoCompleteReviewBookings() {
+        try {
+            const seventyTwoHoursAgo = new Date();
+            seventyTwoHoursAgo.setHours(seventyTwoHoursAgo.getHours() - 72);
+
+            const bookingsToComplete = await this.repo.find({
+                where: {
+                    status: BookingStatus.REVIEW,
+                    updatedAt: LessThanOrEqual(seventyTwoHoursAgo),
+                },
+                relations: ["escrow", "professional", "professional.wallet"],
+            });
+
+            console.log(`[Cron] Found ${bookingsToComplete.length} bookings to auto-complete.`);
+
+            for (const booking of bookingsToComplete) {
+                try {
+                    await this.completeBooking(booking.id, booking.userId);
+                    console.log(`[Cron] Auto-completed booking ${booking.id}`);
+                } catch (err) {
+                    console.error(`[Cron] Failed to auto-complete booking ${booking.id}:`, err);
+                }
+            }
+        } catch (error) {
+            console.error("[Cron] Error in autoCompleteReviewBookings:", error);
+        }
+    }
 }

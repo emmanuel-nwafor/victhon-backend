@@ -1,17 +1,18 @@
 import cron from "node-cron";
-import {createClient, RedisClientType} from "redis";
-import env, {EnvKey} from "./config/env";
+import { createClient, RedisClientType } from "redis";
+import env, { EnvKey } from "./config/env";
 import axios from "axios";
-import {AppDataSource} from "./data-source";
+import { AppDataSource } from "./data-source";
 import redisClient from "./config/redis";
 import createApp from "./config/app";
-import {Worker} from "bullmq";
-import {IWorker, WorkerConfig} from "./types";
-import {RabbitMQ} from "./services/RabbitMQ";
-import {QueueName, QUEUES} from "./config/queues";
+import { Worker } from "bullmq";
+import { IWorker, WorkerConfig } from "./types";
+import { RabbitMQ } from "./services/RabbitMQ";
+import { QueueName, QUEUES } from "./config/queues";
 import Payment from "./services/Payment";
-import {OfflineNotification} from "./jobs/OfflineNotification";
-import {Inbox} from "./jobs/Inbox";
+import BookingService from "./services/Booking";
+import { OfflineNotification } from "./jobs/OfflineNotification";
+import { Inbox } from "./jobs/Inbox";
 // import { Notification } from "./queues/NotificationQueue";
 // import { NewBooking } from "./queues/NewBooking";
 // import { UpdateRatingAgg } from "./queues/UpdateRatingAgg";
@@ -40,7 +41,7 @@ const PORT = env(EnvKey.PORT)!;
         // const pubClient: RedisClientType = createClient({ url: env(EnvKey.REDIS_URL)! });
         const pubClient: RedisClientType = createClient({
             url: env(EnvKey.REDIS_URL)!,  // e.g., rediss://...
-            socket: {reconnectStrategy: retries => Math.min(retries * 50, 500)}  // Exponential backoff
+            socket: { reconnectStrategy: retries => Math.min(retries * 50, 500) }  // Exponential backoff
         });
         pubClient.on("error", (err) => {
             console.error('Redis pubClient connection error:', err);
@@ -57,7 +58,7 @@ const PORT = env(EnvKey.PORT)!;
             .then(() => console.log("✅ DB has connected successfully"))
             .catch(console.error);
 
-        const {server: app, io} = await createApp(pubClient, subClient);
+        const { server: app, io } = await createApp(pubClient, subClient);
 
         for (const queueName of Object.keys(QUEUES) as QueueName[]) RabbitMQ.startConsumer(queueName, io); //! Add try catch
 
@@ -94,7 +95,22 @@ cron.schedule('*/5 * * * *', async () => {
         await paymentService.reconcilePendingTransactions();
     } catch (err) {
         console.error('Reconciliation cron failed', err);
-    }finally {
+    } finally {
         isRunning = false;
+    }
+});
+
+let isEscrowRunning = false;
+// Run every day at midnight to auto-complete old bookings
+cron.schedule('0 0 * * *', async () => {
+    if (isEscrowRunning) return;
+    isEscrowRunning = true;
+    try {
+        const bookingService = new BookingService();
+        await bookingService.autoCompleteReviewBookings();
+    } catch (err) {
+        console.error('Auto-escrow release cron failed', err);
+    } finally {
+        isEscrowRunning = false;
     }
 });

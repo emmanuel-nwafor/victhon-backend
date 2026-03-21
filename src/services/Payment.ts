@@ -490,20 +490,24 @@ export default class Payment extends BaseService {
     }
   }
 
-  public async dispute(reference: string) {
+  public async dispute(bookingId: string) {
     try {
       const result = await AppDataSource.transaction(async (manager) => {
         const transactionRepo = manager.getRepository(Transaction);
         const disputeRepo = manager.getRepository(Dispute);
 
         const transaction = await transactionRepo.findOne({
-          where: { reference, status: TransactionStatus.SUCCESS },
+          where: {
+            escrow: { booking: { id: bookingId } },
+            status: TransactionStatus.SUCCESS,
+            type: TransactionType.BOOKING_DEPOSIT
+          },
           relations: ["escrow", "escrow.booking", "wallet"],
           lock: { mode: "pessimistic_write" },
         });
 
         if (!transaction) {
-          logger.error(`Transaction not found for reference: ${reference}`);
+          logger.error(`Successful transaction not found for bookingId: ${bookingId}`);
           return;
         }
 
@@ -526,6 +530,7 @@ export default class Payment extends BaseService {
           return;
         }
 
+        const reference = `dispute_${transaction.reference}`;
         const disputeTx = transactionRepo.create({
           userId: transaction.userId!,
           escrowId: transaction.escrow!.id,
@@ -536,7 +541,7 @@ export default class Payment extends BaseService {
         });
 
         const newDispute = disputeRepo.create({
-          transactionId: transaction.id,
+          transaction: transaction,
           amount: transaction.amount,
           reason: "Dispute initiated",
         });
@@ -555,7 +560,7 @@ export default class Payment extends BaseService {
           return;
         }
 
-        booking.status = BookingStatus.CANCELLED;
+        booking.status = BookingStatus.DISPUTED;
         wallet.pendingAmount =
           Number(wallet.pendingAmount) - Number(transaction.amount);
         wallet.totalBalance =
