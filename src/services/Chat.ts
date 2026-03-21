@@ -287,39 +287,42 @@ export default class Chat extends Service {
         try {
             const skip = (page - 1) * limit;
 
-            const qb = this.repo
-                .createQueryBuilder("chat")
-                // Join participants and their profiles
-                .leftJoinAndSelect("chat.participants", "participants")
-                .leftJoinAndSelect("participants.user", "user")
-                .leftJoinAndSelect("participants.professional", "professional")
+            // Use findAndCount for more reliable relation mapping
+            const [records, total] = await this.repo.findAndCount({
+                where: {
+                    participants: userType === UserType.PROFESSIONAL
+                        ? { professionalId: userId }
+                        : { userId: userId },
+                },
+                relations: {
+                    participants: {
+                        user: true,
+                        professional: true
+                    },
+                    lastMessage: {
+                        attachments: true
+                    }
+                },
+                order: {
+                    updatedAt: "DESC"
+                },
+                skip,
+                take: limit
+            });
 
-                // filtering: only show chats where the user is a participant
-                .innerJoin(
-                    "chat.participants",
-                    "filterParticipant",
-                    userType === UserType.PROFESSIONAL
-                        ? "filterParticipant.professionalId = :userId"
-                        : "filterParticipant.userId = :userId",
-                    { userId }
-                )
-
-                // ✅ NEW: Join the actual last message relation
-                .leftJoinAndSelect("chat.lastMessage", "lastMessage")
-                .leftJoinAndSelect("lastMessage.attachments", "lastMessageAttachments")
-
-                // Keep your ordering logic
-                .addSelect(subQuery => {
-                    return subQuery
-                        .select("MAX(message.createdAt)")
-                        .from("messages", "message")
-                        .where("message.chatId = chat.id");
-                }, "latestMessageAt")
-                .orderBy("latestMessageAt", "DESC")
-                .skip(skip)
-                .take(limit);
-
-            const [records, total] = await qb.getManyAndCount();
+            // Backfill: If lastMessage is missing but messages exist, update it (idempotent)
+            for (const chat of records) {
+                if (!chat.lastMessage) {
+                    const latestMsg = await this.messageRepo.findOne({
+                        where: { chatId: chat.id },
+                        order: { createdAt: "DESC" }
+                    });
+                    if (latestMsg) {
+                        chat.lastMessage = latestMsg;
+                        await this.repo.update(chat.id, { lastMessageId: latestMsg.id });
+                    }
+                }
+            }
 
             return this.responseData(200, false, "Chats retrieved successfully", {
                 records,
