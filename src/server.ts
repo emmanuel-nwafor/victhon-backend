@@ -62,7 +62,11 @@ const PORT = env(EnvKey.PORT)!;
 
         for (const queueName of Object.keys(QUEUES) as QueueName[]) RabbitMQ.startConsumer(queueName, io); //! Add try catch
 
-        const workerConfig: WorkerConfig = { connection: { url: env(EnvKey.REDIS_URL)! } };
+        const workerConfig: WorkerConfig = {
+            connection: { url: env(EnvKey.REDIS_URL)!, maxRetriesPerRequest: null, enableReadyCheck: false },
+            drainDelay: 3000, 
+            stalledInterval: 300000,
+        };
 
         const IWorkers: IWorker<any>[] = [
             new OfflineNotification(workerConfig, io),

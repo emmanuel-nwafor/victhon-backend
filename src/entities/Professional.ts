@@ -59,6 +59,9 @@ export class Professional {
     @Column({ type: 'varchar', length: 50, nullable: true })
     lastName: string;
 
+    @Column({ type: 'varchar', length: 255, nullable: true, select: false })
+    pin: string;
+
     @Column({ type: 'varchar', length: 50, nullable: true })
     country: string;
 

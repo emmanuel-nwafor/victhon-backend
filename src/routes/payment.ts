@@ -3,7 +3,7 @@ import asyncHandler from "express-async-handler";
 import Controller from '../controllers/Payment';
 import verifyJWT from "../middlewares/verifyJWT";
 import { UserType } from "../types/constants";
-import { initializeValidator, withdrawValidator } from "./../middlewares/routes/payment";
+import { initializeValidator, withdrawValidator, setupPinValidator, resolveAccountValidator } from "./../middlewares/routes/payment";
 
 const paymentRouter = Router();
 
@@ -21,6 +21,11 @@ paymentRouter.get('/flw/callback', (req, res) => {
 });
 paymentRouter.get('/verify/:reference', verifyJWT([UserType.USER]), asyncHandler(Controller.verifyFlwTransaction));
 paymentRouter.post('/withdraw', withdrawValidator, asyncHandler(Controller.withdraw));
+
+paymentRouter.get('/banks', asyncHandler(Controller.getBanks));
+paymentRouter.get('/has-pin', verifyJWT([UserType.PROFESSIONAL]), asyncHandler(Controller.getHasPin));
+paymentRouter.post('/resolve-account', resolveAccountValidator, asyncHandler(Controller.resolveAccount));
+paymentRouter.post('/setup-pin', setupPinValidator, asyncHandler(Controller.setupPin));
 
 
 // paymentRouter.get('/booking/verify/:bookingId', initializeValidator, asyncHandler(verifyBookingTransaction));

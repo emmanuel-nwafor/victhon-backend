@@ -27,9 +27,33 @@ export default class Payment {
         Controller.response(res, serviceResult);
     }
 
+    public static async getBanks(req: Request, res: Response) {
+        const serviceResult = await Payment.service.getBanks();
+        Controller.response(res, serviceResult);
+    }
+
+    public static async resolveAccount(req: Request, res: Response) {
+        const { accountNumber, bankCode } = req.body;
+        const serviceResult = await Payment.service.resolveAccount(accountNumber, bankCode);
+        Controller.response(res, serviceResult);
+    }
+
+    public static async getHasPin(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const serviceResult = await Payment.service.getHasPin(userId);
+        Controller.response(res, serviceResult);
+    }
+
+    public static async setupPin(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { pin } = req.body;
+        const serviceResult = await Payment.service.setupPin(userId, pin);
+        Controller.response(res, serviceResult);
+    }
+
     public static async withdraw(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
-        const { accountId, amount, bankCode, accountNumber, accountName } = req.body;
+        const { accountId, amount, pin, bankCode, accountNumber, accountName } = req.body;
         const parsedAmount = parseFloat(amount) || null;
 
         if (!parsedAmount) {
@@ -38,7 +62,7 @@ export default class Payment {
         }
 
         const accountDetails = (bankCode && accountNumber) ? { bankCode, accountNumber, accountName } : undefined;
-        const serviceResult = await Payment.service.withdraw(userId, accountId, parsedAmount, accountDetails);
+        const serviceResult = await Payment.service.withdraw(userId, accountId, parsedAmount, pin, accountDetails);
         Controller.response(res, serviceResult);
     }
 

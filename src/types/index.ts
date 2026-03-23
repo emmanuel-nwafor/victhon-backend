@@ -94,10 +94,10 @@ export interface QueueConfig {
     handlers: Record<string, EventHandler<any>>;
 }
 
-export interface WorkerConfig {
-    connection: { url: string },
-    concurrency?: number,
-    limiter?: { max: number, duration: number }
+import { WorkerOptions } from "bullmq";
+
+export interface WorkerConfig extends Omit<WorkerOptions, "connection"> {
+    connection: { url: string; [key: string]: any };
 }
 
 export interface IWorker<T> {

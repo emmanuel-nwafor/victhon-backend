@@ -840,7 +840,56 @@ export default class Payment extends BaseService {
     return this.responseData(200, false, null);
   }
 
-  public async withdraw(userId: string, accountId: string | undefined, amount: number, accountDetails?: any) {
+  public async getHasPin(userId: string) {
+    try {
+      const pro = await this.proRepo.createQueryBuilder("pro")
+        .addSelect("pro.pin")
+        .where("pro.id = :id", { id: userId })
+        .getOne();
+      return this.responseData(200, false, "Successfully checked PIN status", { hasPin: !!pro?.pin });
+    } catch (error) {
+      return this.handleTypeormError(error);
+    }
+  }
+
+  public async setupPin(userId: string, pin: string) {
+    try {
+      if (!pin || pin.length < 4) return this.responseData(400, true, "PIN must be at least 4 characters");
+      
+      const Password = require("../utils/Password").default;
+      const hashedPin = Password.hashPassword(pin, env(EnvKey.STORED_SALT)!);
+      
+      await this.proRepo.update({ id: userId }, { pin: hashedPin });
+      return this.responseData(200, false, "PIN setup successfully");
+    } catch (error) {
+      return this.handleTypeormError(error);
+    }
+  }
+
+  public async getBanks() {
+    try {
+      const response = await this.flwClient.get("/banks/NG");
+      return this.responseData(200, false, "Banks retrieved", response.data?.data || []);
+    } catch (error: any) {
+      logger.error("Flutterwave API failed", error.response?.data || error.message);
+      return this.responseData(500, true, "Failed to fetch banks");
+    }
+  }
+
+  public async resolveAccount(accountNumber: string, bankCode: string) {
+    try {
+      const response = await this.flwClient.post("/accounts/resolve", {
+        account_number: accountNumber,
+        account_bank: bankCode
+      });
+      return this.responseData(200, false, "Account resolved", response.data?.data);
+    } catch (error: any) {
+      logger.error("Flutterwave API failed", error.response?.data || error.message);
+      return this.responseData(400, true, "Could not verify account details");
+    }
+  }
+
+  public async withdraw(userId: string, accountId: string | undefined, amount: number, pin: string, accountDetails?: any) {
     try {
       let bankCode, accountNumber, narration;
 
@@ -853,6 +902,17 @@ export default class Payment extends BaseService {
         return this.responseData(400, true, "Insufficient balance");
       if (amount < 100)
         return this.responseData(400, true, "Amount too low for withdrawal");
+
+      const pro = await this.proRepo.createQueryBuilder("pro")
+        .addSelect("pro.pin")
+        .where("pro.id = :id", { id: userId })
+        .getOne();
+
+      if (!pro || !pro.pin) return this.responseData(400, true, "PIN not set up");
+      
+      const Password = require("../utils/Password").default;
+      const isValid = Password.compare(pin, pro.pin, env(EnvKey.STORED_SALT)!);
+      if (!isValid) return this.responseData(400, true, "Invalid PIN");
 
       if (accountId) {
           const account = await this.accountRepo.findOne({
