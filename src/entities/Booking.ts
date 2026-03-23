@@ -16,6 +16,7 @@ import { UserType } from "../types/constants";
 import { ServiceEntity } from "./ServiceEntity";
 import { Escrow } from "./Escrow";
 
+
 export enum BookingStatus {
     PENDING = "pending",
     ACCEPTED = "accepted",
