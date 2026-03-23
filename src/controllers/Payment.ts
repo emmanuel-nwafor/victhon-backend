@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Service from "../services/Payment";
 import Controller from "./Controller";
 
+
 export default class Payment {
 
     private static service: Service = new Service();
@@ -44,7 +45,7 @@ export default class Payment {
     public static async webhook(req: Request, res: Response) {
         const signature = req.headers['verif-hash'];
 
-        const serviceResult = await Payment.service.webhook((req as any).rawBody, signature);
+        const serviceResult = await Payment.service.webhook(req.body, signature);
         res.status(serviceResult.statusCode).send(serviceResult.json.message);
         return;
     }
