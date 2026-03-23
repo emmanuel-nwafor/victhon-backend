@@ -1,3 +1,4 @@
+import axios from "axios";
 import OTPCache from "../cache/otpCache";
 import TokenBlackList from "../cache/TokenBlacklist";
 import env, { EnvKey } from "../config/env";
@@ -10,6 +11,7 @@ import { sendOTP, sendPasswordOTP } from "../utils/mailer";
 import Password from "../utils/Password";
 import Service from "./Service";
 import Token from "./Token";
+import { AuthProvider } from "../types/constants";
 
 export default class Authentication extends Service {
   protected readonly storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -60,63 +62,98 @@ export default class Authentication extends Service {
     return this.generateToken(data, role);
   }
 
-  // public async googleAuth(oathUser: any, userType: any) {
-  //     try {
+  public async googleAuth(idToken: string, userType: UserType) {
+    try {
+      const googleResponse = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      const payload = googleResponse.data;
 
-  //         const userData = {
-  //             firstName: oathUser.name.givenName,
-  //             lastName: oathUser.name.familyName,
-  //             email: oathUser.emails[0].value,
-  //             location: `POINT(${0} ${0})` as any,
-  //             isVerified: oathUser.emails[0].verified,
-  //             authProvider: AuthProvider.GOOGLE
-  //         };
+      if (!payload.email) {
+        return this.responseData(400, true, "Invalid Google token");
+      }
 
-  //         if (userType == UserType.USER) {
-  //             const userRepo = AppDataSource.getRepository(User);
+      const email = payload.email;
+      const firstName = payload.given_name || "";
+      const lastName = payload.family_name || "";
+      const picture = payload.picture || "";
 
-  //             let user = await userRepo.findOneBy({ email: oathUser.emails[0].value });
-  //             if (user) {
-  //                 const token = this.generateUserToken({ id: user.id, userType: UserType.USER }, UserType.USER);
+      if (userType === UserType.USER) {
+        const userRepo = AppDataSource.getRepository(User);
+        let user = await userRepo.findOneBy({ email });
 
-  //                 return this.responseData(200, false, "User has logged in successfully", { token });
+        if (user) {
+          user.authProvider = AuthProvider.GOOGLE;
+          await userRepo.save(user);
+          const token = this.generateUserToken({ id: user.id, userType: UserType.USER }, UserType.USER);
 
-  //             } else {
-  //                 const newUser = userRepo.create(userData);
+          return this.responseData(200, false, "User has logged in successfully", {
+            user: { ...user, password: undefined },
+            token,
+          });
+        } else {
+          const newUser = userRepo.create({
+            email,
+            firstName,
+            lastName,
+            isVerified: true,
+            authProvider: AuthProvider.GOOGLE,
+            profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
+          });
 
-  //                 const savedUser: any = (await userRepo.save(newUser))
-  //                 const token = this.generateUserToken({
-  //                     id: savedUser.id,
-  //                     userType: UserType.USER
-  //                 }, UserType.USER);
+          const savedUser: any = await userRepo.save(newUser);
+          const token = this.generateUserToken(
+            { id: savedUser.id, userType: UserType.USER },
+            UserType.USER,
+          );
 
-  //                 return this.responseData(201, false, "User has been created successfully", { token });
-  //             }
+          return this.responseData(201, false, "User has been created successfully", {
+            user: { ...savedUser, password: undefined },
+            token,
+          });
+        }
+      } else {
+        const professionalRepo = AppDataSource.getRepository(Professional);
+        let pro = await professionalRepo.findOneBy({ email });
 
-  //         } else {
-  //             const professionalRepo = AppDataSource.getRepository(Professional);
-  //             let user = await professionalRepo.findOneBy({ email: oathUser.emails[0].value });
-  //             if (user) {
-  //                 const token = this.generateUserToken({ id: user.id, userType: UserType.PROFESSIONAL }, UserType.PROFESSIONAL);
+        if (pro) {
+          pro.authProvider = AuthProvider.GOOGLE;
+          await professionalRepo.save(pro);
+          const token = this.generateUserToken(
+            { id: pro.id, userType: UserType.PROFESSIONAL },
+            UserType.PROFESSIONAL,
+          );
 
-  //                 return this.responseData(200, false, "Professional has logged in successfully", { token });
+          return this.responseData(200, false, "Professional has logged in successfully", {
+            user: { ...pro, password: undefined },
+            token,
+          });
+        } else {
+          const newPro = professionalRepo.create({
+            email,
+            firstName,
+            lastName,
+            isVerified: true,
+            authProvider: AuthProvider.GOOGLE,
+            profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
+            location: `POINT(${0} ${0})` as any,
+          });
 
-  //             } else {
-  //                 const newUser = professionalRepo.create({ ...userData });
+          const savedPro: any = await professionalRepo.save(newPro);
+          const token = this.generateUserToken(
+            { id: savedPro.id, userType: UserType.PROFESSIONAL },
+            UserType.PROFESSIONAL,
+          );
 
-  //                 const savedUser: any = (await professionalRepo.save(newUser))
-  //                 const token = this.generateUserToken({
-  //                     id: savedUser.id,
-  //                     userType: UserType.PROFESSIONAL
-  //                 }, UserType.PROFESSIONAL);
-
-  //                 return this.responseData(201, false, "Professional has been created successfully", { token });
-  //             }
-  //         }
-  //     } catch (error) {
-  //         return super.handleTypeormError(error);
-  //     }
-  // }
+          return this.responseData(201, false, "Professional has been created successfully", {
+            user: { ...savedPro, password: undefined },
+            token,
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error("Google Auth Error:", error.response?.data || error.message);
+      return this.responseData(401, true, "Google authentication failed");
+    }
+  }
 
   public async signUp(email: string, password: string) {
     try {

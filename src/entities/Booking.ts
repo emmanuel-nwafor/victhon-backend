@@ -10,7 +10,7 @@ import {
     JoinTable,
     ManyToMany, OneToMany, OneToOne,
 } from "typeorm";
-import { Geometry, User } from "./User";
+import { User } from "./User";
 import { Professional } from "./Professional";
 import { UserType } from "../types/constants";
 import { ServiceEntity } from "./ServiceEntity";

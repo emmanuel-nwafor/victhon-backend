@@ -26,14 +26,17 @@ auth.post("/professionals/forgot-password", forgotPassword, asyncHandler(Authent
 auth.post("/professionals/verify-password-reset-otp", verifyPasswordResetOTP, asyncHandler(Authentication.verifyProfessionalPasswordResetOTP));
 auth.post("/professionals/reset-password", resetPassword, asyncHandler(Authentication.resetProfessionalPassword));
 
-auth.get('/google', (req: Request, res: Response, next: NextFunction) => {
-    const type = req.query.type || "user"; // default type
+auth.post("/users/google", asyncHandler(Authentication.userGoogleAuth));
+auth.post("/professionals/google", asyncHandler(Authentication.professionalGoogleAuth));
 
-    passport.authenticate('google', {
-        scope: ['profile', 'email'],
-        state: JSON.stringify({ type }),
-    })(req, res, next);
-});
+// auth.get('/google', (req: Request, res: Response, next: NextFunction) => {
+//     const type = req.query.type || "user"; // default type
+
+//     passport.authenticate('google', {
+//         scope: ['profile', 'email'],
+//         state: JSON.stringify({ type }),
+//     })(req, res, next);
+// });
 
 // auth.get('/google/callback', passport.authenticate('google'), asyncHandler(Authentication.googleAuth),
 //     (err: any, req: any, res: any, next: any) => {

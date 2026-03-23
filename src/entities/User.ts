@@ -1,35 +1,20 @@
-import "reflect-metadata"
 import {
-    Entity,
-    PrimaryColumn,
-    Column,
-    CreateDateColumn,
     UpdateDateColumn,
     OneToMany,
-    ManyToOne,
-    Index,
-    Unique,
-    JoinColumn,
-    PrimaryGeneratedColumn
+    // ManyToOne,
+    // Index,
+    // Unique,
+    // JoinColumn,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    Entity
 } from 'typeorm';
 import { Review } from "./Review";
 import { Transaction } from "./Transaction";
 import ChatParticipant from "./ChatParticipant";
-
-export interface PhotoField {
-    url: string;
-    publicId: string;
-}
-
-export interface Geometry {
-    type: "Point"
-    coordinates: [Number, Number]
-}
-
-export enum AuthProvider {
-    LOCAL = "local",
-    GOOGLE = "google"
-}
+import { AuthProvider } from '../types/constants';
+import { PhotoField } from './ServiceEntity';
 
 
 @Entity('users')
@@ -53,7 +38,7 @@ export class User {
     lastName: string;
 
     @Column({ type: 'json', nullable: true })
-    profilePicture?: PhotoField;
+    profilePicture?: PhotoField | null;
 
     @Column({
         type: "enum",

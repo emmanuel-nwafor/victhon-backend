@@ -102,4 +102,16 @@ export default class Authentication {
         const serviceResult = await Authentication.service.resetPassword(email, newPassword, UserType.PROFESSIONAL);
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
+
+    public static async userGoogleAuth(req: Request, res: Response) {
+        const { idToken } = req.body;
+        const serviceResult = await Authentication.service.googleAuth(idToken, UserType.USER);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
+    public static async professionalGoogleAuth(req: Request, res: Response) {
+        const { idToken } = req.body;
+        const serviceResult = await Authentication.service.googleAuth(idToken, UserType.PROFESSIONAL);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
 }

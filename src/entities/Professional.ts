@@ -21,13 +21,7 @@ import { Transaction } from "./Transaction";
 import { Wallet } from "./Wallet";
 import ChatParticipant from "./ChatParticipant";
 import { Setting } from "./SettingEntity";
-
-// import { AuthProvider } from "./User";
-
-export enum AuthProvider {
-    LOCAL = "local",
-    GOOGLE = "google"
-}
+import { AuthProvider } from "../types/constants";
 
 export interface PhotoField {
     url: string;
@@ -69,10 +63,10 @@ export class Professional {
     state: string;
 
     @Column({ type: 'json', nullable: true })
-    profilePicture?: PhotoField;
+    profilePicture?: PhotoField | null;
     
     @Column({ type: 'json', nullable: true })
-    businessLogo?: PhotoField;
+    businessLogo?: PhotoField | null;
 
     @Column({ type: 'varchar', length: 100, nullable: true })
     bio: string;
