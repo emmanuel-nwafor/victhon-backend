@@ -48,6 +48,9 @@ const PORT = env(EnvKey.PORT)!;
         });
 
         const subClient: RedisClientType = pubClient.duplicate();
+        subClient.on("error", (err) => {
+            console.error('Redis subClient connection error:', err);
+        });
         await Promise.all([pubClient.connect(), subClient.connect()]);
 
 

@@ -122,8 +122,21 @@ export default class Authentication extends Service {
             UserType.PROFESSIONAL,
           );
 
+          const coords = (pro.location as any)
+            ? (pro.location as any)
+              .replace("POINT(", "")
+              .replace(")", "")
+              .split(" ")
+            : ["0", "0"];
+
           return this.responseData(200, false, "Professional has logged in successfully", {
-            user: { ...pro, password: undefined },
+            user: {
+              ...pro,
+              longitude: parseFloat(coords[0]),
+              latitude: parseFloat(coords[1]),
+              location: undefined,
+              password: undefined,
+            },
             token,
           });
         } else {
@@ -144,7 +157,13 @@ export default class Authentication extends Service {
           );
 
           return this.responseData(201, false, "Professional has been created successfully", {
-            user: { ...savedPro, password: undefined },
+            user: {
+              ...savedPro,
+              longitude: 0,
+              latitude: 0,
+              location: undefined,
+              password: undefined,
+            },
             token,
           });
         }
