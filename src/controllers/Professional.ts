@@ -42,4 +42,12 @@ export default class Professional {
         const serviceResult = await Professional.service.setupBusinessProfile(userId, dto);
         Controller.response(res, serviceResult);
     }
+
+    public static async savePushToken(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { pushToken } = req.body;
+
+        const serviceResult = await Professional.service.savePushToken(userId, pushToken);
+        Controller.response(res, serviceResult);
+    }
 }
