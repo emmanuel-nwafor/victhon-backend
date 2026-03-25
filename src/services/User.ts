@@ -166,4 +166,13 @@ export default class User extends Service {
             return this.handleTypeormError(error);
         }
     }
+
+    public async savePushToken(userId: string, pushToken: string) {
+        try {
+            await this.repo.update(userId, { pushToken });
+            return this.responseData(200, false, "Push token saved successfully");
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
 }

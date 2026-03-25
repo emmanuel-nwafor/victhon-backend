@@ -31,4 +31,12 @@ export default class User {
         const serviceResult = await User.service.editUserProfile(userId, editData);
         Controller.response(res, serviceResult);
     }
+
+    public static async savePushToken(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { pushToken } = req.body;
+
+        const serviceResult = await User.service.savePushToken(userId, pushToken);
+        Controller.response(res, serviceResult);
+    }
 }

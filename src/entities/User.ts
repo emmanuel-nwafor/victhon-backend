@@ -1,21 +1,20 @@
+import "reflect-metadata"
 import {
-    UpdateDateColumn,
-    OneToMany,
-    // ManyToOne,
-    // Index,
-    // Unique,
-    // JoinColumn,
+    Entity,
     PrimaryGeneratedColumn,
     Column,
     CreateDateColumn,
-    Entity
+    UpdateDateColumn,
+    OneToMany,
+    Index,
 } from 'typeorm';
-import { Review } from "./Review";
-import { Transaction } from "./Transaction";
 import ChatParticipant from "./ChatParticipant";
-import { AuthProvider } from '../types/constants';
-import { PhotoField } from './ServiceEntity';
+import { AuthProvider } from "../types/constants";
 
+export interface PhotoField {
+    url: string;
+    publicId: string;
+}
 
 @Entity('users')
 export class User {
@@ -28,7 +27,7 @@ export class User {
     @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
     phone: string;
 
-    @Column({ type: 'text', select: false })
+    @Column({ type: 'text', select: false, nullable: true })
     password: string;
 
     @Column({ type: 'varchar', length: 50, nullable: true })
@@ -53,13 +52,10 @@ export class User {
     @Column({ type: 'boolean', default: false })
     isVerified: boolean;
 
-    @OneToMany(() => Review, review => review.user, { cascade: true })
-    reviews: Review[];
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    pushToken: string;
 
-    @OneToMany(() => Transaction, (transaction) => transaction.user)
-    transactions: Transaction[];
-
-    @OneToMany(() => ChatParticipant, (chatParticipants) => chatParticipants.user)
+    @OneToMany(() => ChatParticipant, (chatParticipant) => chatParticipant.user)
     chatParticipants: ChatParticipant[];
 
     @CreateDateColumn()

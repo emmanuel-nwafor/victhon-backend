@@ -11,6 +11,18 @@ import UserCache from "../cache/UserCache";
 import UserChats from "../cache/UserChats";
 
 export default class Professional extends Service {
+    public async savePushToken(userId: string, pushToken: string) {
+        try {
+            const professional = await this.repo.findOne({ where: { id: userId } });
+            if (!professional) return this.responseData(HttpStatus.NOT_FOUND, true, "Professional not found");
+
+            await this.repo.update(userId, { pushToken });
+
+            return this.responseData(HttpStatus.OK, false, "Push token saved successfully");
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
 
     private readonly socketCache = new UserSocket();
     private readonly userCache: UserCache = new UserCache(UserType.PROFESSIONAL);

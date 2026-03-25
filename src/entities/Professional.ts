@@ -159,6 +159,9 @@ export class Professional {
     @Column({ type: 'varchar', length: 255, nullable: true })
     ninSlipUrl: string;
 
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    pushToken: string;
+
     @CreateDateColumn()
     createdAt: Date;
 
