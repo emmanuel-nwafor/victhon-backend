@@ -6,9 +6,10 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     OneToMany,
-    Index,
 } from 'typeorm';
 import ChatParticipant from "./ChatParticipant";
+import { Review } from "./Review";
+import { Transaction } from "./Transaction";
 import { AuthProvider } from "../types/constants";
 
 export interface PhotoField {
@@ -57,6 +58,12 @@ export class User {
 
     @OneToMany(() => ChatParticipant, (chatParticipant) => chatParticipant.user)
     chatParticipants: ChatParticipant[];
+
+    @OneToMany(() => Review, (review) => review.user)
+    reviews: Review[];
+
+    @OneToMany(() => Transaction, (transaction) => transaction.user)
+    transactions: Transaction[];
 
     @CreateDateColumn()
     createdAt: Date;
