@@ -13,6 +13,7 @@ async function testPush() {
         process.exit(1);
     }
 
+
     console.log(`Sending test notification to ${testToken}...`);
 
     try {
