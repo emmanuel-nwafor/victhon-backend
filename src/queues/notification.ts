@@ -90,10 +90,11 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             if (recipient?.pushToken) {
                 const { title, body } = getNotificationContent(data.type, data.data);
                 logger.info(`📱 Sending push notification to ${data.userId} (${data.userType}): ${title}`);
-                await pushService.sendNotification(recipient.pushToken, title, body, {
+                const result = await pushService.sendNotification(recipient.pushToken, title, body, {
                     notificationId: savedNotification.id,
                     type: data.type,
                 });
+                logger.info(`📱 Push notification result for ${data.userId}: ${result ? 'Sent to Expo' : 'Failed'}`);
             } else if (provider === "push") {
                 logger.warn(`⚠️ Cannot send push to ${data.userId}: No pushToken found.`);
             }

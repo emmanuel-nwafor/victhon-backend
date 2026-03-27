@@ -125,10 +125,15 @@ export default class PushNotificationService {
   private handleTickets(tickets: ExpoPushTicket[]) {
     for (const ticket of tickets) {
       if (ticket.status === 'error') {
-        logger.error(`Error sending notification: ${ticket.message}`);
-        if (ticket.details && ticket.details.error === 'DeviceNotRegistered') {
-          logger.warn('Device not registered. Consider removing this token from DB.');
+        logger.error(`❌ [PushService] Error sending notification: ${ticket.message}`);
+        if (ticket.details) {
+          logger.error(`❌ [PushService] Error details: ${JSON.stringify(ticket.details)}`);
+          if (ticket.details.error === 'DeviceNotRegistered') {
+            logger.warn('⚠️ [PushService] Device not registered. Consider removing this token from DB.');
+          }
         }
+      } else {
+        logger.info(`✅ [PushService] Notification delivered successfully. Ticket ID: ${ticket.id}`);
       }
     }
   }
