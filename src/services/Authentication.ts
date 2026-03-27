@@ -184,7 +184,7 @@ export default class Authentication extends Service {
       }
     } catch (error: any) {
       console.error("Google Auth Error:", error.response?.data || error.message);
-      const message = error.response?.data?.message || "Google authentication failed. Please try again.";
+      const message = error.response?.data?.error_description || error.response?.data?.message || error.message || "Google authentication failed. Please try again.";
       return this.responseData(401, true, message);
     }
   }

@@ -290,6 +290,16 @@ export default class BookingService extends Service {
             if (!booking)
                 return this.responseData(404, true, "Booking was not found");
 
+            // Parse professional location if it exists
+            if (booking.professional && (booking.professional as any).location) {
+                const coords = ((booking.professional as any).location as string)
+                    .replace("POINT(", "")
+                    .replace(")", "")
+                    .split(" ");
+                (booking.professional as any).longitude = parseFloat(coords[0] || "0");
+                (booking.professional as any).latitude = parseFloat(coords[1] || "0");
+            }
+
             return this.responseData(
                 200,
                 false,
@@ -313,6 +323,16 @@ export default class BookingService extends Service {
 
             if (!booking)
                 return this.responseData(404, true, "Booking was not found");
+
+            // Parse professional location if it exists
+            if (booking.professional && (booking.professional as any).location) {
+                const coords = ((booking.professional as any).location as string)
+                    .replace("POINT(", "")
+                    .replace(")", "")
+                    .split(" ");
+                (booking.professional as any).longitude = parseFloat(coords[0] || "0");
+                (booking.professional as any).latitude = parseFloat(coords[1] || "0");
+            }
 
             return this.responseData(
                 200,
