@@ -19,6 +19,8 @@ import ChatEntity from "../entities/ChatEntity";
 import MessageAttachment from "../entities/MessageAttachment";
 import { exchange, FailedFiles, UploadedFiles } from "../types";
 import { AppDataSource } from "../data-source";
+import notify, { NotificationProvider } from "../services/notify";
+import { NotificationType } from "../entities/Notification";
 
 const chat = new RabbitMQRouter({
     name: QueueNames.CHAT,
@@ -112,6 +114,14 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                 );
             });
             logger.info(`📫 ${receiverType}:${receiverId} message has been added to inbox successfully.`);
+            
+            // Send push notification when user is offline
+            await notify({
+                userId: receiverId,
+                userType: receiverType,
+                type: NotificationType.VIEW_PROFILE, // TODO: Add CHAT type if available, using default for now
+                data: { ...newMessage, chat: undefined }
+            }, NotificationProvider.PUSH);
         }
     } catch (error) {
         console.error("CHAT_SEND_MESSAGE: ", error);
@@ -436,6 +446,14 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
                 );
             });
             logger.info(`📫 ${receiverType}:${receiverId} message attachment has been added to inbox successfully.`);
+            
+            // Send push notification when user is offline
+            await notify({
+                userId: receiverId,
+                userType: receiverType,
+                type: NotificationType.VIEW_PROFILE, // TODO: Add CHAT type if available, using default for now
+                data: { ...newMessage, chat: undefined }
+            }, NotificationProvider.PUSH);
         }
     } catch (error) {
         console.error("CHAT_RECEIVE_ATTACHMENT: ", error);

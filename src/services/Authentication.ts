@@ -78,8 +78,9 @@ export default class Authentication extends Service {
 
       if (userType === UserType.USER) {
         const userRepo = AppDataSource.getRepository(User);
+        const proRepo = AppDataSource.getRepository(Professional);
+        
         let user = await userRepo.findOneBy({ email });
-
         if (user) {
           user.authProvider = AuthProvider.GOOGLE;
           await userRepo.save(user);
@@ -89,31 +90,38 @@ export default class Authentication extends Service {
             user: { ...user, password: undefined },
             token,
           });
-        } else {
-          const newUser = userRepo.create({
-            email,
-            firstName,
-            lastName,
-            isVerified: true,
-            authProvider: AuthProvider.GOOGLE,
-            profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
-          });
-
-          const savedUser: any = await userRepo.save(newUser);
-          const token = this.generateUserToken(
-            { id: savedUser.id, userType: UserType.USER },
-            UserType.USER,
-          );
-
-          return this.responseData(201, false, "User has been created successfully", {
-            user: { ...savedUser, password: undefined },
-            token,
-          });
         }
+        
+        // Check if they exist as a professional
+        const existingPro = await proRepo.findOneBy({ email });
+        if (existingPro) {
+          return this.responseData(409, true, "This email is already registered as a Professional. Please log in as a Professional.");
+        }
+
+        const newUser = userRepo.create({
+          email,
+          firstName,
+          lastName,
+          isVerified: true,
+          authProvider: AuthProvider.GOOGLE,
+          profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
+        });
+
+        const savedUser: any = await userRepo.save(newUser);
+        const token = this.generateUserToken(
+          { id: savedUser.id, userType: UserType.USER },
+          UserType.USER,
+        );
+
+        return this.responseData(201, false, "User has been created successfully", {
+          user: { ...savedUser, password: undefined },
+          token,
+        });
       } else {
         const professionalRepo = AppDataSource.getRepository(Professional);
+        const userRepo = AppDataSource.getRepository(User);
+        
         let pro = await professionalRepo.findOneBy({ email });
-
         if (pro) {
           pro.authProvider = AuthProvider.GOOGLE;
           await professionalRepo.save(pro);
@@ -139,38 +147,45 @@ export default class Authentication extends Service {
             },
             token,
           });
-        } else {
-          const newPro = professionalRepo.create({
-            email,
-            firstName,
-            lastName,
-            isVerified: true,
-            authProvider: AuthProvider.GOOGLE,
-            profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
-            location: `POINT(${0} ${0})` as any,
-          });
-
-          const savedPro: any = await professionalRepo.save(newPro);
-          const token = this.generateUserToken(
-            { id: savedPro.id, userType: UserType.PROFESSIONAL },
-            UserType.PROFESSIONAL,
-          );
-
-          return this.responseData(201, false, "Professional has been created successfully", {
-            user: {
-              ...savedPro,
-              longitude: 0,
-              latitude: 0,
-              location: undefined,
-              password: undefined,
-            },
-            token,
-          });
         }
+        
+        // Check if they exist as a user
+        const existingUser = await userRepo.findOneBy({ email });
+        if (existingUser) {
+          return this.responseData(409, true, "This email is already registered as a Customer. Please log in as a Customer.");
+        }
+
+        const newPro = professionalRepo.create({
+          email,
+          firstName,
+          lastName,
+          isVerified: true,
+          authProvider: AuthProvider.GOOGLE,
+          profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
+          location: `POINT(${0} ${0})` as any,
+        });
+
+        const savedPro: any = await professionalRepo.save(newPro);
+        const token = this.generateUserToken(
+          { id: savedPro.id, userType: UserType.PROFESSIONAL },
+          UserType.PROFESSIONAL,
+        );
+
+        return this.responseData(201, false, "Professional has been created successfully", {
+          user: {
+            ...savedPro,
+            longitude: 0,
+            latitude: 0,
+            location: undefined,
+            password: undefined,
+          },
+          token,
+        });
       }
     } catch (error: any) {
       console.error("Google Auth Error:", error.response?.data || error.message);
-      return this.responseData(401, true, "Google authentication failed");
+      const message = error.response?.data?.message || "Google authentication failed. Please try again.";
+      return this.responseData(401, true, message);
     }
   }
 

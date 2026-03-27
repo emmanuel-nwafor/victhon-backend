@@ -63,6 +63,8 @@ export default class PushNotificationService {
         title,
         body,
         data,
+        channelId: 'alerts',
+        priority: 'high',
       });
     }
 
