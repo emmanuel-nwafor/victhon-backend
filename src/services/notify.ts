@@ -4,7 +4,8 @@ import { QueueEvents, QueueNames } from "../types/constants";
 
 export enum NotificationProvider {
     Email = "email",
-    SOCKET = "socket"
+    SOCKET = "socket",
+    PUSH = "push"
 }
 
 async function notify(data: any, provider: NotificationProvider = NotificationProvider.SOCKET) {

@@ -52,7 +52,7 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
 
     try {
 
-        if (provider == "socket") {
+        if (provider == "socket" || provider == "push") {
 
             const userService = new UserService();
             const proService = new ProfessionalService();
@@ -76,23 +76,26 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
 
             const savedNotification = await repo.save(newNotification);
 
-            if (socketId) {
-                logger.info(`🏃 Notifying ${data.userType}:${data.userId}, notification type:${data.type}`)
+            // Handle Socket Notification
+            if (socketId && provider === "socket") {
+                logger.info(`🏃 Notifying ${data.userType}:${data.userId} via Socket, type:${data.type}`)
 
                 const notificationNamespace = io.of(Namespaces.BASE);
                 notificationNamespace.to(socketId).emit("notification", { notification: savedNotification });
-            } else {
-                logger.info(`📴 user:${data.userId} is offline`)
+            } else if (!socketId && provider === "socket") {
+                logger.info(`📴 User ${data.userId} is offline, skipping Socket`)
             }
 
-            // Send Push Notification if token exists
+            // Handle Push Notification
             if (recipient?.pushToken) {
                 const { title, body } = getNotificationContent(data.type, data.data);
-                logger.info(`📱 Sending push notification to ${data.userId}: ${title}`);
+                logger.info(`📱 Sending push notification to ${data.userId} (${data.userType}): ${title}`);
                 await pushService.sendNotification(recipient.pushToken, title, body, {
                     notificationId: savedNotification.id,
                     type: data.type,
                 });
+            } else if (provider === "push") {
+                logger.warn(`⚠️ Cannot send push to ${data.userId}: No pushToken found.`);
             }
         }
     } catch (error) {
