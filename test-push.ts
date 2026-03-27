@@ -7,13 +7,14 @@ async function testPush() {
     const pushService = new PushNotificationService();
     const testToken = process.argv[2];
 
+
     if (!testToken) {
         console.error('Please provide an Expo push token as an argument');
         process.exit(1);
     }
 
     console.log(`Sending test notification to ${testToken}...`);
-    
+
     try {
         const result = await pushService.sendNotification(
             testToken,
