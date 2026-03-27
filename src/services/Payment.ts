@@ -878,14 +878,31 @@ export default class Payment extends BaseService {
 
   public async resolveAccount(accountNumber: string, bankCode: string) {
     try {
+      const cleanAccountNumber = String(accountNumber || "").replace(/[^0-9]/g, '');
+      const cleanBankCode = String(bankCode || "").replace(/[^0-9]/g, '');
+
+      logger.info(`🔍 Flutterwave Resolve: "${cleanAccountNumber}" at bank code "${cleanBankCode}"`);
+
       const response = await this.flwClient.post("/accounts/resolve", {
-        account_number: accountNumber,
-        account_bank: bankCode
+        account_number: cleanAccountNumber,
+        account_bank: cleanBankCode
       });
       return this.responseData(200, false, "Account resolved", response.data?.data);
     } catch (error: any) {
-      logger.error("Flutterwave API failed", error.response?.data || error.message);
-      return this.responseData(400, true, "Could not verify account details");
+      const flwError = error.response?.data || error.message;
+      logger.error("Flutterwave API failed", flwError);
+
+      const errorMessage = typeof flwError === 'object' ? flwError.message : String(flwError);
+
+      if (errorMessage?.toLowerCase().includes('only 044 is allowed')) {
+        return this.responseData(400, true, "Flutterwave Test Mode only supports Access Bank (code: 044). Please verify you are using a correct Access Bank account.");
+      }
+
+      if (errorMessage?.toLowerCase().includes('must be numberic')) {
+        return this.responseData(400, true, `Flutterwave requires numeric account details. Got: Account=${accountNumber}, Bank=${bankCode}`);
+      }
+
+      return this.responseData(400, true, "Could not verify account details. " + (errorMessage || ""));
     }
   }
 
