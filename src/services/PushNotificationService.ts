@@ -99,17 +99,20 @@ export default class PushNotificationService {
         userType === UserType.PROFESSIONAL ? Professional : User
       );
       
-      const user = await repo.findOne({ 
+      const recipient = await repo.findOne({ 
         where: { id: userId } as any,
         select: ['pushToken'] as any
       });
 
-      if (!user || !user.pushToken) {
+      if (!recipient?.pushToken) {
         logger.warn(`Push token not found for ${userType} ID: ${userId}`);
+        console.log(`❌ [PushService] No pushToken found in DB for ${userType} ID: ${userId}`);
         return null;
       }
 
-      return await this.sendNotification(user.pushToken, title, body, data);
+      console.log(`✅ [PushService] Found pushToken for ${userType} ID: ${userId}: ${recipient.pushToken}`);
+
+      return await this.sendNotification(recipient.pushToken, title, body, data);
     } catch (error) {
       logger.error(`Error in sendToUser for ${userType} ${userId}:`, error);
       return null;
