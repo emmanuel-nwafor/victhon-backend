@@ -136,14 +136,27 @@ export default class User extends Service {
 
 
 
-            const updatedData = {
-                firstName: editData.firstName?.trim() ?? user.firstName,
-                lastName: editData.lastName?.trim() ?? user.lastName,
+            // Restrict name changes
+            if (editData.firstName && user.firstName && editData.firstName.trim() !== user.firstName) {
+                return this.responseData(400, true, "First name change is restricted. Please contact support.");
+            }
+            if (editData.lastName && user.lastName && editData.lastName.trim() !== user.lastName) {
+                return this.responseData(400, true, "Last name change is restricted. Please contact support.");
+            }
+
+            const updatedData: any = {
                 email: editData.email ?? user.email,
                 phone: editData.phone ?? user.phone,
                 isActive: editData.isActive ?? user.isActive,
                 profilePicture: profilePicture!,
             };
+
+            if (!user.firstName && editData.firstName) {
+                updatedData.firstName = editData.firstName.trim();
+            }
+            if (!user.lastName && editData.lastName) {
+                updatedData.lastName = editData.lastName.trim();
+            }
 
             await this.repo.update(userId, updatedData);
 

@@ -231,9 +231,15 @@ export default class Professional extends Service {
 
             if (editData.longitude && editData.latitude) location = `POINT(${editData.longitude} ${editData.latitude})` as any;
 
-            const updatedData = {
-                firstName: editData.firstName?.trim() ?? professional.firstName,
-                lastName: editData.lastName?.trim() ?? professional.lastName,
+            // Restrict name changes
+            if (editData.firstName && professional.firstName && editData.firstName.trim() !== professional.firstName) {
+                return this.responseData(400, true, "First name change is restricted. Please contact support.");
+            }
+            if (editData.lastName && professional.lastName && editData.lastName.trim() !== professional.lastName) {
+                return this.responseData(400, true, "Last name change is restricted. Please contact support.");
+            }
+
+            const updatedData: any = {
                 email: editData.email ?? professional.email,
                 phone: editData.phone ?? professional.phone,
                 country: editData.country ?? professional.country,
@@ -250,6 +256,13 @@ export default class Professional extends Service {
                 businessLogo: businessLogo!,
                 location
             };
+
+            if (!professional.firstName && editData.firstName) {
+                updatedData.firstName = editData.firstName.trim();
+            }
+            if (!professional.lastName && editData.lastName) {
+                updatedData.lastName = editData.lastName.trim();
+            }
 
             await this.repo.update(professionalId, updatedData);
 
