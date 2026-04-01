@@ -149,12 +149,16 @@ export default class BookingService extends Service {
                 return await manager.save(booking);
             });
 
-            await notify({
-                userId: professionalId,
-                userType: UserType.PROFESSIONAL,
-                type: NotificationType.BOOKING,
-                data: data,
-            });
+            try {
+                await notify({
+                    userId: professionalId,
+                    userType: UserType.PROFESSIONAL,
+                    type: NotificationType.BOOKING,
+                    data: data,
+                });
+            } catch (notifyError) {
+                console.error("Failed to send booking notification:", notifyError);
+            }
 
             return this.responseData(
                 201,
@@ -370,12 +374,16 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.ACCEPTED;
             const updatedBooking = await this.repo.save(booking);
 
-            await notify({
-                userId: booking.userId,
-                userType: UserType.USER,
-                type: NotificationType.ACCEPTED_BOOKING,
-                data: { ...updatedBooking, user: undefined },
-            });
+            try {
+                await notify({
+                    userId: booking.userId,
+                    userType: UserType.USER,
+                    type: NotificationType.ACCEPTED_BOOKING,
+                    data: { ...updatedBooking, user: undefined },
+                });
+            } catch (notifyError) {
+                console.error("Failed to send acceptance notification:", notifyError);
+            }
             return this.responseData(
                 200,
                 false,
@@ -408,12 +416,16 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.REJECTED;
             const updatedBooking = await this.repo.save(booking);
 
-            await notify({
-                userId: booking.userId,
-                userType: UserType.USER,
-                type: NotificationType.REJECTED_BOOKING,
-                data: { ...updatedBooking, user: undefined },
-            });
+            try {
+                await notify({
+                    userId: booking.userId,
+                    userType: UserType.USER,
+                    type: NotificationType.REJECTED_BOOKING,
+                    data: { ...updatedBooking, user: undefined },
+                });
+            } catch (notifyError) {
+                console.error("Failed to send rejection notification:", notifyError);
+            }
 
             return this.responseData(
                 200,
@@ -454,12 +466,16 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.REVIEW;
             const updatedBooking = await this.repo.save(booking);
 
-            await notify({
-                userId: booking.userId,
-                userType: UserType.USER,
-                type: NotificationType.REVIEW_BOOKING,
-                data: { ...updatedBooking, user: undefined },
-            });
+            try {
+                await notify({
+                    userId: booking.userId,
+                    userType: UserType.USER,
+                    type: NotificationType.REVIEW_BOOKING,
+                    data: { ...updatedBooking, user: undefined },
+                });
+            } catch (notifyError) {
+                console.error("Failed to send review notification:", notifyError);
+            }
 
             return this.responseData(
                 200,
@@ -502,12 +518,16 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.ON_THE_WAY;
             const updatedBooking = await this.repo.save(booking);
 
-            await notify({
-                userId: booking.userId,
-                userType: UserType.USER,
-                type: NotificationType.BOOKING,
-                data: { ...updatedBooking, services: undefined },
-            });
+            try {
+                await notify({
+                    userId: booking.userId,
+                    userType: UserType.USER,
+                    type: NotificationType.BOOKING,
+                    data: { ...updatedBooking, services: undefined },
+                });
+            } catch (notifyError) {
+                console.error("Failed to send start moving notification:", notifyError);
+            }
 
             return this.responseData(200, false, "Professional is now on the way.", updatedBooking);
         } catch (error) {
