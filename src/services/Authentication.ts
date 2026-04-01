@@ -184,7 +184,17 @@ export default class Authentication extends Service {
       }
     } catch (error: any) {
       console.error("Google Auth Error:", error.response?.data || error.message);
-      const message = error.response?.data?.error_description || error.response?.data?.message || error.message || "Google authentication failed. Please try again.";
+      
+      let message = error.response?.data?.error_description || error.response?.data?.message;
+
+      if (!message) {
+        if (error.message && (error.message.includes("Field ") || error.message.includes("column ") || error.message.includes("SQL") || error.message.includes("sql"))) {
+          message = "We're currently experiencing issues with Google Sign-In. Please use email and password to sign in or try again later.";
+        } else {
+          message = error.message || "Google authentication failed. Please try again.";
+        }
+      }
+
       return this.responseData(401, true, message);
     }
   }

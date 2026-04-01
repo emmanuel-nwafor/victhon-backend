@@ -44,7 +44,7 @@ export class Professional {
     @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
     phone: string;
 
-    @Column({ type: 'text', select: false })
+    @Column({ type: 'text', select: false, nullable: true })
     password: string;
 
     @Column({ type: 'varchar', length: 50, nullable: true })
