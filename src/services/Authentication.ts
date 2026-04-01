@@ -12,6 +12,7 @@ import Password from "../utils/Password";
 import Service from "./Service";
 import Token from "./Token";
 import { AuthProvider } from "../types/constants";
+import { normalizeEmail } from "../utils/normalizeEmail";
 
 export default class Authentication extends Service {
   protected readonly storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -71,7 +72,7 @@ export default class Authentication extends Service {
         return this.responseData(400, true, "Invalid Google token");
       }
 
-      const email = payload.email;
+      const email = normalizeEmail(payload.email);
       const firstName = payload.given_name || "";
       const lastName = payload.family_name || "";
       const picture = payload.picture || "";
@@ -201,6 +202,7 @@ export default class Authentication extends Service {
 
   public async signUp(email: string, password: string) {
     try {
+      email = normalizeEmail(email);
       const userRepository = AppDataSource.getRepository(User);
 
       let existingUser = await userRepository.findOneBy({ email: email });
@@ -255,6 +257,7 @@ export default class Authentication extends Service {
 
   public async signUps(signUpData: any) {
     try {
+      if (signUpData.email) signUpData.email = normalizeEmail(signUpData.email);
       const userRepo = AppDataSource.getRepository(User);
 
       let userEmailExists = await userRepo.findOneBy({
@@ -312,6 +315,7 @@ export default class Authentication extends Service {
   // * User(normal user) login service
   public async login(email: string, password: string) {
     try {
+      email = normalizeEmail(email);
       const userRepo = AppDataSource.getRepository(User);
 
       let result = await userRepo
@@ -371,6 +375,7 @@ export default class Authentication extends Service {
 
   public async professionalSignUp(email: string, password: string) {
     try {
+      email = normalizeEmail(email);
       const professionalRepo = AppDataSource.getRepository(Professional);
 
       let existingUser = await professionalRepo.findOneBy({ email: email });
@@ -474,6 +479,7 @@ export default class Authentication extends Service {
 
   public async professionalLogin(email: string, password: string) {
     try {
+      email = normalizeEmail(email);
       const professionalRepo = AppDataSource.getRepository(Professional);
 
       let result = await professionalRepo
@@ -543,6 +549,7 @@ export default class Authentication extends Service {
 
   public async verifyOTP(email: string, otp: string, userType: UserType) {
     try {
+      email = normalizeEmail(email);
       const otpResult = await this.otpCache.getVerificationOTP(email, userType);
       if (otpResult.error) {
         return this.responseData(
@@ -624,6 +631,7 @@ export default class Authentication extends Service {
 
   public async resendOTP(email: string, userType: UserType) {
     try {
+      email = normalizeEmail(email);
       if (userType === UserType.USER) {
         const userRepo = AppDataSource.getRepository(User);
         const user = await userRepo.findOneBy({ email });
@@ -677,6 +685,7 @@ export default class Authentication extends Service {
 
   public async forgotPassword(email: string, userType: UserType) {
     try {
+      email = normalizeEmail(email);
       const repo = userType === UserType.USER
         ? AppDataSource.getRepository(User)
         : AppDataSource.getRepository(Professional);
@@ -712,6 +721,7 @@ export default class Authentication extends Service {
 
   public async verifyPasswordResetOTP(email: string, otp: string, userType: UserType) {
     try {
+      email = normalizeEmail(email);
       const otpResult = await this.otpCache.getPasswordResetOTP(email, userType);
       if (otpResult.error) {
         return this.responseData(
@@ -740,6 +750,7 @@ export default class Authentication extends Service {
 
   public async resetPassword(email: string, newPassword: string, userType: UserType) {
     try {
+      email = normalizeEmail(email);
       const verifiedResult = await this.otpCache.getPasswordResetVerified(email, userType);
       if (verifiedResult.error || !verifiedResult.data?.verified) {
         return this.responseData(
