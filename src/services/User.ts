@@ -182,6 +182,21 @@ export default class User extends Service {
 
     public async savePushToken(userId: string, pushToken: string) {
         try {
+            // Token Exclusivity: Remove this token from any other User
+            await this.repo.createQueryBuilder()
+                .update(UserEntity)
+                .set({ pushToken: null as any })
+                .where("pushToken = :pushToken AND id != :userId", { pushToken, userId })
+                .execute();
+
+            // Also remove from any Professional (using raw query or importing Pro repo)
+            await AppDataSource.getRepository("professionals")
+                .createQueryBuilder()
+                .update()
+                .set({ pushToken: null })
+                .where("pushToken = :pushToken", { pushToken })
+                .execute();
+
             await this.repo.update(userId, { pushToken });
             return this.responseData(200, false, "Push token saved successfully");
         } catch (error) {
