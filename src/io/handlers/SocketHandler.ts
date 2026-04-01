@@ -156,7 +156,7 @@ export default class SocketHandler {
             logger.info(`📩 ${senderType}:${senderId} sent a message to ${receiverType}:${receiverId} successfully.`);
 
             if (created) {
-                await SocketHandler.chatRepo.update(chatId, { 
+                await SocketHandler.chatRepo.update(chatId, {
                     lastMessageId: created.id,
                     updatedAt: new Date()
                 });
@@ -481,7 +481,7 @@ export default class SocketHandler {
 
         const socketNamespace = io.of(Namespaces.BASE);
         logger.info(`📍 Location update for booking ${bookingId}: ${latitude}, ${longitude}`);
-        
+
         // Broadcast to everyone in the booking room
         socketNamespace.to(`booking_${bookingId}`).emit("location-updated", {
             bookingId,

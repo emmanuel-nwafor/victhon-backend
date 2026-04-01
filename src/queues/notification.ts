@@ -68,7 +68,7 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             const repo = AppDataSource.getRepository(Notification);
 
             const userId = data.userType == UserType.PROFESSIONAL ? { professionalId: data.userId } : { userId: data.userId };
-            
+
             const recipient = data.userType === UserType.PROFESSIONAL
                 ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: data.userId } })
                 : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: data.userId } });

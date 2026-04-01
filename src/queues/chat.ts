@@ -85,7 +85,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                 const sender = newMessage.senderType === UserType.PROFESSIONAL
                     ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderId } })
                     : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderId } });
-                
+
                 const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
 
                 await notify({
@@ -133,7 +133,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
             const sender = newMessage.senderType === UserType.PROFESSIONAL
                 ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderId } })
                 : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderId } });
-            
+
             const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
 
             await notify({
@@ -363,7 +363,7 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
         const createdMessage = await messageRepo.save(newMessage);
 
         if (createdMessage) {
-            await AppDataSource.getRepository(ChatEntity).update(chatId, { 
+            await AppDataSource.getRepository(ChatEntity).update(chatId, {
                 lastMessageId: createdMessage.id,
                 updatedAt: new Date()
             });
@@ -482,12 +482,12 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
                 );
             });
             logger.info(`📫 ${receiverType}:${receiverId} message attachment has been added to inbox successfully.`);
-            
+
             // Send push notification when user is offline
             const sender = newMessage.senderType === UserType.PROFESSIONAL
                 ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: newMessage.senderId } })
                 : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: newMessage.senderId } });
-            
+
             const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
 
             await notify({
