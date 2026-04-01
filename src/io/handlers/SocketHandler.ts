@@ -41,10 +41,10 @@ export default class SocketHandler {
             if (!wasSet) socket.emit("appError", Handler.responseData(true, "An internal error occurred"));
 
             const offline = new OfflineNotification();
-            await offline.deliverOfflineNotifications(userId, userType);
+            offline.deliverOfflineNotifications(userId, userType).catch(err => console.error("Offline delivery error:", err));
 
             const inbox = new Inbox();
-            await inbox.deliverInbox(userId, userType);
+            inbox.deliverInbox(userId, userType).catch(err => console.error("Inbox delivery error:", err));
 
             logger.info(`🤝 ${userType}:${userId} with the socket id - ${socketId} has connected.`);
         } catch (error) {

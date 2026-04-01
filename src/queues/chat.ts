@@ -79,6 +79,22 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
             if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-delivered", { messageId: newMessage.id });
 
             logger.info(`📧 New message for ${receiverType}:${receiverId}`);
+
+            // Send push notification if not actively in chat
+            if (!inChat) {
+                const sender = newMessage.senderType === UserType.PROFESSIONAL
+                    ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderId } })
+                    : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderId } });
+                
+                const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
+
+                await notify({
+                    userId: receiverId,
+                    userType: receiverType,
+                    type: NotificationType.CHAT,
+                    data: { ...newMessage, senderName, chat: undefined }
+                }, NotificationProvider.PUSH);
+            }
             return;
         } else {
             logger.info(`📴 ${receiverType}:${receiverId} is offline`);
@@ -113,14 +129,18 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                     1
                 );
             });
-            logger.info(`📫 ${receiverType}:${receiverId} message has been added to inbox successfully.`);
-            
             // Send push notification when user is offline
+            const sender = newMessage.senderType === UserType.PROFESSIONAL
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderId } })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderId } });
+            
+            const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
+
             await notify({
                 userId: receiverId,
                 userType: receiverType,
-                type: NotificationType.VIEW_PROFILE, // TODO: Add CHAT type if available, using default for now
-                data: { ...newMessage, chat: undefined }
+                type: NotificationType.CHAT,
+                data: { ...newMessage, senderName, chat: undefined }
             }, NotificationProvider.PUSH);
         }
     } catch (error) {
@@ -411,6 +431,22 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
             if (senderSocketId) socketNamespace.to(senderSocketId).emit("attachment-delivered", { messageId: newMessage.id });
 
             logger.info(`📧 New message attachment for ${receiverType}:${receiverId}`);
+
+            // Send push notification if not actively in chat
+            if (!inChat) {
+                const sender = newMessage.senderType === UserType.PROFESSIONAL
+                    ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: newMessage.senderId } })
+                    : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: newMessage.senderId } });
+
+                const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
+
+                await notify({
+                    userId: receiverId,
+                    userType: receiverType,
+                    type: NotificationType.CHAT,
+                    data: { ...newMessage, senderName, content: "Sent an attachment", chat: undefined }
+                }, NotificationProvider.PUSH);
+            }
             return;
         } else {
             logger.info(`📴 ${receiverType}:${receiverId} is offline`);
@@ -448,11 +484,17 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
             logger.info(`📫 ${receiverType}:${receiverId} message attachment has been added to inbox successfully.`);
             
             // Send push notification when user is offline
+            const sender = newMessage.senderType === UserType.PROFESSIONAL
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: newMessage.senderId } })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: newMessage.senderId } });
+            
+            const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
+
             await notify({
                 userId: receiverId,
                 userType: receiverType,
-                type: NotificationType.VIEW_PROFILE, // TODO: Add CHAT type if available, using default for now
-                data: { ...newMessage, chat: undefined }
+                type: NotificationType.CHAT,
+                data: { ...newMessage, senderName, content: "Sent an attachment", chat: undefined }
             }, NotificationProvider.PUSH);
         }
     } catch (error) {

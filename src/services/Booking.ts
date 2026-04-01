@@ -375,14 +375,14 @@ export default class BookingService extends Service {
             const updatedBooking = await this.repo.save(booking);
 
             try {
-                await notify({
+                notify({
                     userId: booking.userId,
                     userType: UserType.USER,
                     type: NotificationType.ACCEPTED_BOOKING,
                     data: { ...updatedBooking, user: undefined },
-                });
+                }).catch(err => console.error("Failed to send acceptance notification:", err));
             } catch (notifyError) {
-                console.error("Failed to send acceptance notification:", notifyError);
+                console.error("Failed to trigger acceptance notification:", notifyError);
             }
             return this.responseData(
                 200,
@@ -417,14 +417,14 @@ export default class BookingService extends Service {
             const updatedBooking = await this.repo.save(booking);
 
             try {
-                await notify({
+                notify({
                     userId: booking.userId,
                     userType: UserType.USER,
                     type: NotificationType.REJECTED_BOOKING,
                     data: { ...updatedBooking, user: undefined },
-                });
+                }).catch(err => console.error("Failed to send rejection notification:", err));
             } catch (notifyError) {
-                console.error("Failed to send rejection notification:", notifyError);
+                console.error("Failed to trigger rejection notification:", notifyError);
             }
 
             return this.responseData(

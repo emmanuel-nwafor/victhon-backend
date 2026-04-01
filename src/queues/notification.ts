@@ -42,6 +42,13 @@ function getNotificationContent(type: NotificationType, data: any) {
             return { title: "Booking Disputed", body: "A dispute has been opened for a booking." };
         case NotificationType.NEW_REVIEW:
             return { title: "New Review", body: "You have received a new review!" };
+        case NotificationType.CHAT:
+            const senderName = data?.senderName || "Someone";
+            return { title: "New Message", body: `${senderName}: ${data?.content || "Sent you a message"}` };
+        case NotificationType.ON_THE_WAY:
+            return { title: "On The Way", body: "The professional is on their way to your location." };
+        case NotificationType.COMPLETED:
+            return { title: "Service Completed", body: "The service has been marked as completed." };
         default:
             return { title: "Victhon Update", body: "You have a new notification." };
     }

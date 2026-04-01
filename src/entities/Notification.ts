@@ -26,6 +26,9 @@ export enum NotificationType {
     REFUND_FAILED = "refundFailed",
     DISPUTED = "disputed",
     NEW_REVIEW = "new_review",
+    CHAT = "chat",
+    ON_THE_WAY = "on_the_way",
+    COMPLETED = "completed",
 }
 
 export enum NotificationStatus {
