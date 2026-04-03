@@ -113,21 +113,18 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
                     const { title, body } = getNotificationContent(data.type, data.data);
                     logger.info(`📱 Sending push notification to ${data.userId} (${data.userType}): ${title}`);
                     console.log(`[NOTIFICATION_WORKER] Sending push to ${recipient.email || data.userId}...`);
-                    
+                    logger.info(`📤 [NOTIFICATION_QUEUE] Sending push to User:${data.userId} using token:${recipient.pushToken.substring(0, 15)}...`);
                     const result = await pushService.sendNotification(recipient.pushToken, title, body, {
-                        notificationId: savedNotification.id,
-                        type: data.type,
+                        ...data,
+                        notificationId: savedNotification.id
                     });
-                    
-                    logger.info(`📱 Push notification result for ${data.userId}: ${result ? 'Sent to Expo' : 'Failed'}`);
-                    console.log(`[NOTIFICATION_WORKER] Push notification result for ${recipient.email || data.userId}: ${result ? 'SUCCESS' : 'FAILED'}`);
-                } catch (pushError) {
-                    console.error(`[NOTIFICATION_WORKER] ERROR: Fatal failure sending push to ${data.userId}:`, pushError);
+                    logger.info(`✅ [NOTIFICATION_QUEUE] Push dispatched for User:${data.userId}. Result count: ${result?.length || 0}`);
+                } catch (error) {
+                    logger.error(`❌ [NOTIFICATION_QUEUE] Failed to send push to User:${data.userId}:`, error);
                 }
             } else {
                 if (provider === "push") {
-                   logger.warn(`⚠️ Cannot send push to ${data.userId}: No pushToken found.`);
-                   console.log(`[NOTIFICATION_WORKER] WARNING: Required push but no pushToken found for ${data.userId}`);
+                    logger.warn(`⚠️ [NOTIFICATION_QUEUE] Cannot send push to ${data.userId}: No pushToken found in DB.`);
                 } else {
                    console.log(`[NOTIFICATION_WORKER] No pushToken found for ${data.userId}, skipping push.`);
                 }

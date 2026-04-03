@@ -17,21 +17,6 @@ export default class Professional extends Service {
             const professional = await this.repo.findOne({ where: { id: userId } });
             if (!professional) return this.responseData(HttpStatus.NOT_FOUND, true, "Professional not found");
 
-            // Token Exclusivity: Remove this token from any other Professional
-            await this.repo.createQueryBuilder()
-                .update(ProfessionalEntity)
-                .set({ pushToken: null as any })
-                .where("pushToken = :pushToken AND id != :userId", { pushToken, userId })
-                .execute();
-
-            // Also remove from any User
-            await AppDataSource.getRepository("users")
-                .createQueryBuilder()
-                .update()
-                .set({ pushToken: null })
-                .where("pushToken = :pushToken", { pushToken })
-                .execute();
-
             await this.repo.update(userId, { pushToken });
 
             return this.responseData(HttpStatus.OK, false, "Push token saved successfully");
