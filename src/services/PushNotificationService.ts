@@ -18,12 +18,15 @@ export default class PushNotificationService {
   private async getExpo() {
     if (!this.expo || !this.ExpoClass) {
       try {
+        console.log('[PUSH_SERVICE] Initializing Expo SDK...');
         // Use dynamic import to avoid ERR_REQUIRE_ESM
         const sdk = await (eval('import("expo-server-sdk")') as Promise<typeof import('expo-server-sdk')>);
         this.ExpoClass = sdk.Expo;
         this.expo = new sdk.Expo();
+        console.log('[PUSH_SERVICE] Expo SDK initialized successfully.');
       } catch (error) {
-        logger.error('Failed to initialize Expo SDK:', error);
+        logger.error('[PUSH_SERVICE] Failed to initialize Expo SDK:', error);
+        console.error('[PUSH_SERVICE] ERROR: Failed to initialize Expo SDK. Push notifications will NOT work.', error);
         throw error;
       }
     }
@@ -68,6 +71,8 @@ export default class PushNotificationService {
       });
     }
 
+    console.log(`[PUSH_SERVICE] Preparing to send ${messages.length} notifications...`);
+
     // Batch the messages to send multiple at once
     let chunks = expo.chunkPushNotifications(messages);
     let tickets: ExpoPushTicket[] = [];
@@ -77,7 +82,8 @@ export default class PushNotificationService {
         let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
       } catch (error) {
-        logger.error('Error sending push notification chunk:', error);
+        logger.error('[PUSH_SERVICE] Error sending push notification chunk:', error);
+        console.error('[PUSH_SERVICE] ERROR: Failed to send push chunk to Expo server:', error);
       }
     }
 
@@ -97,26 +103,28 @@ export default class PushNotificationService {
     data: any = {}
   ) {
     try {
+      console.log(`[PUSH_SERVICE] Fetching pushToken for ${userType} ID: ${userId}`);
       const repo = AppDataSource.getRepository(
         userType === UserType.PROFESSIONAL ? Professional : User
       );
       
       const recipient = await repo.findOne({ 
         where: { id: userId } as any,
-        select: ['pushToken'] as any
+        select: ['pushToken', 'email'] as any
       });
 
       if (!recipient?.pushToken) {
-        logger.warn(`Push token not found for ${userType} ID: ${userId}`);
-        console.log(`❌ [PushService] No pushToken found in DB for ${userType} ID: ${userId}`);
+        logger.warn(`[PUSH_SERVICE] Push token not found for ${userType} ID: ${userId} (${recipient?.email || 'unknown email'})`);
+        console.log(`❌ [PUSH_SERVICE] No pushToken found for ${userType} (${recipient?.email || userId})`);
         return null;
       }
 
-      console.log(`✅ [PushService] Found pushToken for ${userType} ID: ${userId}: ${recipient.pushToken}`);
+      console.log(`✅ [PUSH_SERVICE] Found pushToken for ${userType} (${recipient.email}): ${recipient.pushToken.substring(0, 15)}...`);
 
       return await this.sendNotification(recipient.pushToken, title, body, data);
     } catch (error) {
-      logger.error(`Error in sendToUser for ${userType} ${userId}:`, error);
+      logger.error(`[PUSH_SERVICE] Error in sendToUser for ${userType} ${userId}:`, error);
+      console.error(`❌ [PUSH_SERVICE] Fatal error sending to user ${userId}:`, error);
       return null;
     }
   }
@@ -127,15 +135,18 @@ export default class PushNotificationService {
   private handleTickets(tickets: ExpoPushTicket[]) {
     for (const ticket of tickets) {
       if (ticket.status === 'error') {
-        logger.error(`❌ [PushService] Error sending notification: ${ticket.message}`);
+        logger.error(`❌ [PUSH_SERVICE] Error sending notification: ${ticket.message}`);
+        console.error(`❌ [PUSH_SERVICE] Ticket error: ${ticket.message}`);
         if (ticket.details) {
-          logger.error(`❌ [PushService] Error details: ${JSON.stringify(ticket.details)}`);
-          if (ticket.details.error === 'DeviceNotRegistered') {
-            logger.warn('⚠️ [PushService] Device not registered. Consider removing this token from DB.');
+          logger.error(`❌ [PUSH_SERVICE] Ticket error details: ${JSON.stringify(ticket.details)}`);
+          if ((ticket.details as any).error === 'DeviceNotRegistered') {
+            logger.warn('⚠️ [PUSH_SERVICE] Device not registered. Consider removing this token from DB.');
+            console.log('⚠️ [PUSH_SERVICE] DeviceNotRegistered: This token is no longer valid.');
           }
         }
       } else {
-        logger.info(`✅ [PushService] Notification delivered successfully. Ticket ID: ${ticket.id}`);
+        logger.info(`✅ [PUSH_SERVICE] Notification delivered to Expo. Ticket ID: ${ticket.id}`);
+        console.log(`✅ [PUSH_SERVICE] Notification queued at Expo. Ticket ID: ${ticket.id}`);
       }
     }
   }

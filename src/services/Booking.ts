@@ -149,16 +149,15 @@ export default class BookingService extends Service {
                 return await manager.save(booking);
             });
 
-            try {
-                await notify({
-                    userId: professionalId,
-                    userType: UserType.PROFESSIONAL,
-                    type: NotificationType.BOOKING,
-                    data: data,
-                });
-            } catch (notifyError) {
-                console.error("Failed to send booking notification:", notifyError);
-            }
+            // Non-blocking notification
+            notify({
+                userId: professionalId,
+                userType: UserType.PROFESSIONAL,
+                type: NotificationType.BOOKING,
+                data: data,
+            }).catch(notifyError => {
+                console.error("[BOOKING_FLOW] Failed to queue booking notification:", notifyError);
+            });
 
             return this.responseData(
                 201,
@@ -374,16 +373,13 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.ACCEPTED;
             const updatedBooking = await this.repo.save(booking);
 
-            try {
-                notify({
-                    userId: booking.userId,
-                    userType: UserType.USER,
-                    type: NotificationType.ACCEPTED_BOOKING,
-                    data: { ...updatedBooking, user: undefined },
-                }).catch(err => console.error("Failed to send acceptance notification:", err));
-            } catch (notifyError) {
-                console.error("Failed to trigger acceptance notification:", notifyError);
-            }
+            // Non-blocking notification
+            notify({
+                userId: booking.userId,
+                userType: UserType.USER,
+                type: NotificationType.ACCEPTED_BOOKING,
+                data: { ...updatedBooking, user: undefined },
+            }).catch(err => console.error("[BOOKING_FLOW] Failed to queue acceptance notification:", err));
             return this.responseData(
                 200,
                 false,
@@ -416,16 +412,13 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.REJECTED;
             const updatedBooking = await this.repo.save(booking);
 
-            try {
-                notify({
-                    userId: booking.userId,
-                    userType: UserType.USER,
-                    type: NotificationType.REJECTED_BOOKING,
-                    data: { ...updatedBooking, user: undefined },
-                }).catch(err => console.error("Failed to send rejection notification:", err));
-            } catch (notifyError) {
-                console.error("Failed to trigger rejection notification:", notifyError);
-            }
+            // Non-blocking notification
+            notify({
+                userId: booking.userId,
+                userType: UserType.USER,
+                type: NotificationType.REJECTED_BOOKING,
+                data: { ...updatedBooking, user: undefined },
+            }).catch(err => console.error("[BOOKING_FLOW] Failed to queue rejection notification:", err));
 
             return this.responseData(
                 200,
@@ -466,16 +459,13 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.REVIEW;
             const updatedBooking = await this.repo.save(booking);
 
-            try {
-                await notify({
-                    userId: booking.userId,
-                    userType: UserType.USER,
-                    type: NotificationType.REVIEW_BOOKING,
-                    data: { ...updatedBooking, user: undefined },
-                });
-            } catch (notifyError) {
-                console.error("Failed to send review notification:", notifyError);
-            }
+            // Non-blocking notification
+            notify({
+                userId: booking.userId,
+                userType: UserType.USER,
+                type: NotificationType.REVIEW_BOOKING,
+                data: { ...updatedBooking, user: undefined },
+            }).catch(err => console.error("[BOOKING_FLOW] Failed to queue review notification:", err));
 
             return this.responseData(
                 200,
@@ -518,16 +508,13 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.ON_THE_WAY;
             const updatedBooking = await this.repo.save(booking);
 
-            try {
-                await notify({
-                    userId: booking.userId,
-                    userType: UserType.USER,
-                    type: NotificationType.BOOKING,
-                    data: { ...updatedBooking, services: undefined },
-                });
-            } catch (notifyError) {
-                console.error("Failed to send start moving notification:", notifyError);
-            }
+            // Non-blocking notification
+            notify({
+                userId: booking.userId,
+                userType: UserType.USER,
+                type: NotificationType.BOOKING,
+                data: { ...updatedBooking, services: undefined },
+            }).catch(err => console.error("[BOOKING_FLOW] Failed to queue start moving notification:", err));
 
             return this.responseData(200, false, "Professional is now on the way.", updatedBooking);
         } catch (error) {

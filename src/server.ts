@@ -67,7 +67,7 @@ const PORT = env(EnvKey.PORT)!;
 
         const workerConfig: WorkerConfig = {
             connection: { url: env(EnvKey.REDIS_URL)!, maxRetriesPerRequest: null, enableReadyCheck: false },
-            drainDelay: 3000, 
+            drainDelay: 3000,
             stalledInterval: 300000,
         };
 

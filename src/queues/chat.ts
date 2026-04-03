@@ -88,14 +88,15 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
 
                 const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
 
-                await notify({
+                // Non-blocking push notification
+                notify({
                     userId: receiverId,
                     userType: receiverType,
                     type: NotificationType.CHAT,
                     data: { ...newMessage, senderName, chat: undefined }
-                }, NotificationProvider.PUSH);
+                }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue chat notification (online):", err));
+                return;
             }
-            return;
         } else {
             logger.info(`📴 ${receiverType}:${receiverId} is offline`);
 
@@ -136,12 +137,13 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
 
             const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
 
-            await notify({
+            // Non-blocking push notification when user is offline
+            notify({
                 userId: receiverId,
                 userType: receiverType,
                 type: NotificationType.CHAT,
                 data: { ...newMessage, senderName, chat: undefined }
-            }, NotificationProvider.PUSH);
+            }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue chat notification (offline):", err));
         }
     } catch (error) {
         console.error("CHAT_SEND_MESSAGE: ", error);
@@ -440,14 +442,15 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
 
                 const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
 
-                await notify({
+                // Non-blocking push notification
+                notify({
                     userId: receiverId,
                     userType: receiverType,
                     type: NotificationType.CHAT,
                     data: { ...newMessage, senderName, content: "Sent an attachment", chat: undefined }
-                }, NotificationProvider.PUSH);
+                }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue attachment notification (online):", err));
+                return;
             }
-            return;
         } else {
             logger.info(`📴 ${receiverType}:${receiverId} is offline`);
 
@@ -490,12 +493,13 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
 
             const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
 
-            await notify({
+            // Non-blocking push notification when user is offline
+            notify({
                 userId: receiverId,
                 userType: receiverType,
                 type: NotificationType.CHAT,
                 data: { ...newMessage, senderName, content: "Sent an attachment", chat: undefined }
-            }, NotificationProvider.PUSH);
+            }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue attachment notification (offline):", err));
         }
     } catch (error) {
         console.error("CHAT_RECEIVE_ATTACHMENT: ", error);

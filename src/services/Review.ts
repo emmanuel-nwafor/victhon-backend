@@ -87,12 +87,12 @@ export default class Review extends Service {
             });
 
             if (data) {
-                await notify({
+                notify({
                     userId: professionalId,
                     userType: UserType.PROFESSIONAL,
                     type: NotificationType.NEW_REVIEW,
                     data: data
-                });
+                }).catch(err => console.error("[REVIEW_FLOW] Failed to queue review notification:", err));
             }
 
             return this.responseData(201, false, "Review was created successfully", data);

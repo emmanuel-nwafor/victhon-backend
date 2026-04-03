@@ -578,12 +578,12 @@ export default class Payment extends BaseService {
       });
 
       if (result) {
-        await notify({
+        notify({
           userId: result.professionalId,
           userType: UserType.PROFESSIONAL,
           type: NotificationType.CANCEL_BOOKING,
           data: { ...result, professional: undefined },
-        });
+        }).catch(err => console.error("[PAYMENT_FLOW] Failed to queue dispute notification:", err));
       } else {
         logger.error("Dispute transaction failed");
       }
@@ -679,12 +679,12 @@ export default class Payment extends BaseService {
         await this.bookingRepo.save(booking);
         await this.transactionRepo.save(refundTx);
 
-        await notify({
+        notify({
           userId: booking.professionalId,
           userType: UserType.PROFESSIONAL,
           type: NotificationType.DISPUTED,
           data: { ...booking, professional: undefined },
-        });
+        }).catch(err => console.error("[PAYMENT_FLOW] Failed to queue refund notification:", err));
 
         return this.responseData(
           200,
@@ -784,12 +784,12 @@ export default class Payment extends BaseService {
       });
 
       if (result) {
-        await notify({
+        notify({
           userId: result.userId,
           userType: UserType.USER,
           type: NotificationType.REFUND_FAILED,
           data: result,
-        });
+        }).catch(err => console.error("[PAYMENT_FLOW] Failed to queue refund-failed notification:", err));
         logger.info(`💸 Refund failed for transaction: ${result.id}`);
       }
     } catch (error) {
