@@ -512,7 +512,7 @@ export default class BookingService extends Service {
             notify({
                 userId: booking.userId,
                 userType: UserType.USER,
-                type: NotificationType.BOOKING,
+                type: NotificationType.ON_THE_WAY,
                 data: { ...updatedBooking, services: undefined },
             }).catch(err => console.error("[BOOKING_FLOW] Failed to queue start moving notification:", err));
 
@@ -602,6 +602,21 @@ export default class BookingService extends Service {
                 eventType: eventType,
                 payload,
             });
+
+            // Non-blocking notification for successful completion
+            notify({
+                userId: result.userId,
+                userType: UserType.USER,
+                type: NotificationType.COMPLETED,
+                data: { ...result, professional: undefined, escrow: undefined }
+            }).catch(err => console.error("[BOOKING_FLOW] Failed to notify customer of completion:", err));
+
+            notify({
+                userId: result.professionalId,
+                userType: UserType.PROFESSIONAL,
+                type: NotificationType.COMPLETED,
+                data: { ...result, professional: undefined, escrow: undefined }
+            }).catch(err => console.error("[BOOKING_FLOW] Failed to notify professional of completion:", err));
 
             return this.responseData(
                 200,

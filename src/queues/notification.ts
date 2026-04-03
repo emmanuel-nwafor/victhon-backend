@@ -49,6 +49,14 @@ function getNotificationContent(type: NotificationType, data: any) {
             return { title: "On The Way", body: "The professional is on their way to your location." };
         case NotificationType.COMPLETED:
             return { title: "Service Completed", body: "The service has been marked as completed." };
+        case NotificationType.REVIEW_BOOKING:
+            return { title: "Booking in Review", body: "The professional has marked the booking as ready for your review." };
+        case NotificationType.ESCROW_RELEASE:
+            return { title: "Funds Released", body: "Payment for your booking has been released to your wallet." };
+        case NotificationType.REFUND_FAILED:
+            return { title: "Refund Failed", body: "An attempt to refund your booking has failed. Please contact support." };
+        case NotificationType.REFUNDED_BOOKING:
+            return { title: "Booking Refunded", body: "Your booking has been successfully refunded." };
         default:
             return { title: "Victhon Update", body: "You have a new notification." };
     }
