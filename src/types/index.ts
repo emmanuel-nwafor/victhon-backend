@@ -32,6 +32,9 @@ export class EditProfessionalDto {
     isActive?: boolean;
     longitude?: number;
     latitude?: number;
+    businessName?: string;
+    businessCategory?: string;
+    businessType?: string;
     file?: Express.Multer.File | undefined; // profile picture
     businessLogo?: Express.Multer.File | undefined;
 };

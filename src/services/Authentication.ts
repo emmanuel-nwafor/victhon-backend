@@ -7,14 +7,13 @@ import { Professional } from "../entities/Professional";
 import { User } from "../entities/User";
 import { HttpStatus, UserType } from "../types/constants";
 import deleteFiles from "../utils/deleteFiles";
-import { sendOTP, sendPasswordOTP } from "../utils/mailer";
+import { AuthProvider } from "../types/constants";
+import { normalizeEmail } from "../utils/normalizeEmail";
+import EmailService from "./Email";
 import Password from "../utils/Password";
 import Service from "./Service";
 import Token from "./Token";
-import { AuthProvider } from "../types/constants";
-import { normalizeEmail } from "../utils/normalizeEmail";
-import Email from "./Email";
-import path from "path";
+import logger from "../config/logger";
 
 export default class Authentication extends Service {
   protected readonly storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -22,6 +21,7 @@ export default class Authentication extends Service {
   protected readonly secretKey: string = env(EnvKey.SECRET_KEY)!;
   protected readonly tokenBlackListCache: TokenBlackList = new TokenBlackList();
   protected readonly otpCache: OTPCache = new OTPCache();
+  private readonly emailService: EmailService = new EmailService();
 
   private generateOTP() {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -34,7 +34,7 @@ export default class Authentication extends Service {
       return false;
     }
 
-    await sendOTP(email, otp);
+    await this.emailService.sendOTP(email, otp);
     return true;
   }
 
@@ -45,18 +45,15 @@ export default class Authentication extends Service {
       return false;
     }
 
-    await sendPasswordOTP(email, otp);
+    await this.emailService.sendPasswordOTP(email, otp);
     return true;
   }
 
   private async sendWelcomeEmail(email: string, name: string) {
     try {
-      const emailService = new Email();
-      const templatePath = path.join(__dirname, "../views/welcome.ejs");
-      const html = (await emailService.getEmailTemplate({ name }, templatePath)) as string;
-      await emailService.sendEmail("Victhon <no-reply@victhon.co>", email, "Welcome to Victhon!", html);
+      await this.emailService.sendWelcomeEmail(email, name);
     } catch (error) {
-      console.error("Welcome email failed:", error);
+      logger.error("Welcome email failed:", error);
     }
   }
 

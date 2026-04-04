@@ -255,6 +255,9 @@ export default class Professional extends Service {
                 isActive: editData.isActive ?? professional.isActive,
                 profilePicture: profilePicture!,
                 businessLogo: businessLogo!,
+                businessName: editData.businessName ?? professional.businessName,
+                businessCategory: editData.businessCategory ?? professional.businessCategory,
+                businessType: editData.businessType ?? professional.businessType,
                 location
             };
 

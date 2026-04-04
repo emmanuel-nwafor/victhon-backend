@@ -31,13 +31,13 @@ function getNotificationContent(type: NotificationType, data: any) {
         case NotificationType.BOOKING:
             return { title: "New Booking", body: "You have a new booking request!" };
         case NotificationType.ACCEPTED_BOOKING:
-            return { title: "Booking Accepted", body: "Your booking has been accepted by the professional." };
+            return { title: "Booking Accepted", body: "Your booking has been accepted by the service provider." };
         case NotificationType.REJECTED_BOOKING:
             return { title: "Booking Rejected", body: "Your booking request was rejected." };
         case NotificationType.VIEW_PROFILE:
             return { title: "Profile View", body: "Someone just viewed your profile!" };
         case NotificationType.BOOKING_PAYMENT:
-            return { title: "Payment Received", body: "Payment for your booking has been received." };
+            return { title: "Payment Received", body: "Payment for your booking has been received and processed successfully." };
         case NotificationType.CANCEL_BOOKING:
             return { title: "Booking Cancelled", body: "A booking has been cancelled." };
         case NotificationType.DISPUTED:
@@ -48,11 +48,11 @@ function getNotificationContent(type: NotificationType, data: any) {
             const senderName = data?.senderName || "Someone";
             return { title: "New Message", body: `${senderName}: ${data?.content || "Sent you a message"}` };
         case NotificationType.ON_THE_WAY:
-            return { title: "On The Way", body: "The professional is on their way to your location." };
+            return { title: "On The Way", body: "The service provider is on their way to your location." };
         case NotificationType.COMPLETED:
             return { title: "Service Completed", body: "The service has been marked as completed." };
         case NotificationType.REVIEW_BOOKING:
-            return { title: "Booking in Review", body: "The professional has marked the booking as ready for your review." };
+            return { title: "Booking in Review", body: "The service provider has marked the booking as ready for your review." };
         case NotificationType.ESCROW_RELEASE:
             return { title: "Funds Released", body: "Payment for your booking has been released to your wallet." };
         case NotificationType.REFUND_FAILED:
@@ -72,8 +72,8 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             const userService = new UserService();
             const proService = new ProfessionalService();
 
-            const socketId = data.userType == UserType.PROFESSIONAL 
-                ? await proService.getSocketId(data.userId) 
+            const socketId = data.userType == UserType.PROFESSIONAL
+                ? await proService.getSocketId(data.userId)
                 : await userService.getSocketId(data.userId);
 
             const repo = AppDataSource.getRepository(Notification);
@@ -104,12 +104,12 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             if (recipient?.pushToken) {
                 try {
                     const { title, body } = getNotificationContent(data.type, data.data);
-                    
+
                     const result = await pushService.sendNotification(recipient.pushToken, title, body, {
                         ...data,
                         notificationId: savedNotification.id
                     });
-                    
+
                     console.log(`[NOTIFICATION_WORKER] ✅ Push status for ${data.userId}: ${result?.length ? 'SENT' : 'FAILED'}`);
                 } catch (error) {
                     logger.error(`Failed to send push to User:${data.userId}:`, error);
