@@ -134,10 +134,18 @@ export default class SocketHandler {
             if (receiverType == UserType.PROFESSIONAL) where = { professional: { id: receiverId }, chat: { id: chatId } };
             if (receiverType == UserType.USER) where = { chat: { id: chatId }, user: { id: receiverId } };
 
-            const chatParticipant = await SocketHandler.chatParticipantsRepo.findOne({ where, relations: ["chat"], });
+            const relations = ["chat"];
+            if (receiverType === UserType.PROFESSIONAL) relations.push("professional", "professional.setting");
+
+            const chatParticipant = await SocketHandler.chatParticipantsRepo.findOne({ where, relations });
 
             if (!chatParticipant) {
                 socket.emit("appError", Handler.responseData(true, "Chat does not exist,create a chat first"));
+                return;
+            }
+
+            if (receiverType === UserType.PROFESSIONAL && chatParticipant.professional?.setting?.newMessagesEnabled === false) {
+                socket.emit("appError", Handler.responseData(true, "This professional is currently not accepting new messages."));
                 return;
             }
 

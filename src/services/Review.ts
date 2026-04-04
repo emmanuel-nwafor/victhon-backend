@@ -23,10 +23,15 @@ export default class Review extends Service {
             const data = await AppDataSource.transaction(async (manager) => {
                 const existingProfessional = await manager.findOne(Professional, {
                     where: { id: professionalId },
+                    relations: ["setting"],
                 });
 
                 if (!existingProfessional) {
                     throw new Error('Professional was not found');
+                }
+
+                if (existingProfessional.setting && existingProfessional.setting.customerReviewsEnabled === false) {
+                    throw new Error("This professional is currently not accepting customer reviews.");
                 }
 
                 // 2. Prevent duplicate reviews (VERY IMPORTANT)

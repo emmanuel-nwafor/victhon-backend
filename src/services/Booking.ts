@@ -47,6 +47,7 @@ export default class BookingService extends Service {
 
         const professional = await this.professionalRepo.findOne({
             where: { id: professionalId },
+            relations: ["setting"],
         });
 
         if (!professional)
@@ -54,6 +55,9 @@ export default class BookingService extends Service {
 
         if (!professional.availability)
             return this.responseData(400, true, "Professional is unavailable.");
+
+        if (professional.setting && professional.setting.bookingRequestsEnabled === false)
+            return this.responseData(400, true, "This professional is currently not accepting booking requests.");
 
         // Check if professional profile is complete
         const isProfileComplete = await this.isProfileComplete(professionalId);

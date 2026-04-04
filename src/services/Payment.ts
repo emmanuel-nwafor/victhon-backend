@@ -843,10 +843,13 @@ export default class Payment extends BaseService {
   public async getHasPin(userId: string) {
     try {
       const pro = await this.proRepo.createQueryBuilder("pro")
+        .leftJoinAndSelect("pro.account", "account")
         .addSelect("pro.pin")
         .where("pro.id = :id", { id: userId })
         .getOne();
-      return this.responseData(200, false, "Successfully checked PIN status", { hasPin: !!pro?.pin });
+      
+      const accountDetails = pro?.account?.[0] || null;
+      return this.responseData(200, false, "Successfully checked PIN status", { hasPin: !!pro?.pin, account: accountDetails });
     } catch (error) {
       return this.handleTypeormError(error);
     }
@@ -931,21 +934,32 @@ export default class Payment extends BaseService {
       const isValid = Password.compare(pin, pro.pin, env(EnvKey.STORED_SALT)!);
       if (!isValid) return this.responseData(400, true, "Invalid PIN");
 
-      if (accountId) {
-          const account = await this.accountRepo.findOne({
-            where: { id: accountId, professionalId: userId },
-          });
+      const existingAccount = await this.accountRepo.findOne({
+          where: { professionalId: userId },
+          order: { createdAt: "ASC" }
+      });
 
-          if (!account) return this.responseData(404, true, "Account not found");
-          bankCode = account.bankCode;
-          accountNumber = account.accountNumber;
-          narration = `Withdrawal to ${account.name}`;
-      } else if (accountDetails) {
-          bankCode = accountDetails.bankCode;
-          accountNumber = accountDetails.accountNumber;
-          narration = `Withdrawal to ${accountDetails.accountName || "User"}`;
+      if (existingAccount) {
+          bankCode = existingAccount.bankCode;
+          accountNumber = existingAccount.accountNumber;
+          narration = `Withdrawal to ${existingAccount.name}`;
       } else {
-          return this.responseData(400, true, "Bank details are required");
+          if (!accountDetails || !accountDetails.bankCode || !accountDetails.accountNumber) {
+              return this.responseData(400, true, "Bank details are required to set up your first withdrawal account.");
+          }
+          
+          const newAccount = this.accountRepo.create({
+              professionalId: userId,
+              name: accountDetails.accountName || "Professional",
+              accountNumber: accountDetails.accountNumber,
+              bankCode: accountDetails.bankCode,
+              bankName: accountDetails.bankName || "Unknown Bank"
+          });
+          await this.accountRepo.save(newAccount);
+
+          bankCode = newAccount.bankCode;
+          accountNumber = newAccount.accountNumber;
+          narration = `Withdrawal to ${newAccount.name}`;
       }
 
       const reference = `wd_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
