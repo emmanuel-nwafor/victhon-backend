@@ -29,11 +29,12 @@ import socketEvent from "../io/events/socketEvent";
 import validateJWT from "../middlewares/validateJWT";
 import verifyJWT from "../middlewares/verifyJWT";
 import { Namespaces, UserType } from "../types/constants";
+import setting from "../routes/setting";
 
 
 export default async function createApp(pubClient: RedisClientType, subClient: RedisClientType) {
     const app: Application = express();
-    const stream = {write: (message: string) => logger.http(message.trim())};
+    const stream = { write: (message: string) => logger.http(message.trim()) };
     const server = http.createServer(app);
     const io = await initializeIO(server, pubClient, subClient);
 
@@ -49,14 +50,14 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
 
     app.use(helmet());
     app.set('trust proxy', 1); // For a single proxy (e.g., Render)
-    app.use(express.urlencoded({extended: true}));
-    app.use(cors({origin: '*'}))
-    app.use(morgan("combined", {stream}));
+    app.use(express.urlencoded({ extended: true }));
+    app.use(cors({ origin: '*' }))
+    app.use(morgan("combined", { stream }));
     app.use(express.json());
 
     // Configure session with RedisStore
     app.use(session({
-        store: new RedisStore({client: pubClient}),
+        store: new RedisStore({ client: pubClient }),
         secret: process.env.SESSION_SECRET || 'your-secret-key-here',
         resave: false,
         saveUninitialized: false,
@@ -82,14 +83,14 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use("/api/v1/reviews", review);
     app.use("/api/v1/payments", payment);
     app.use("/api/v1/chats", chat);
-
+    app.use("/api/v1/settings", setting);
     app.use("/api/v1/professionals/wallets", verifyJWT([UserType.PROFESSIONAL]), wallet);
 
 
     app.post("/api/v1/test", async (req: Request, res: Response) => {
 
         try {
-            let {lat = 9.076479, lng = 7.401962, radius = 5} = req.query;
+            let { lat = 9.076479, lng = 7.401962, radius = 5 } = req.query;
             const parsedRaduis = (radius as any) * 1000;
 
             if (!lat || !lng) {
@@ -113,7 +114,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
                     "distance"
                 )
                 .where("user.location IS NOT NULL")
-                .having("distance <= :radius", {radius: parsedRaduis})
+                .having("distance <= :radius", { radius: parsedRaduis })
                 .orderBy("distance", "ASC")
                 .getRawMany();
 
@@ -138,7 +139,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
 
         } catch (error) {
             console.error(error);
-            return res.status(500).json({error: "Server error"});
+            return res.status(500).json({ error: "Server error" });
         }
     });
 
@@ -163,5 +164,5 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
         return;
     });
 
-    return {server, io};
+    return { server, io };
 }
