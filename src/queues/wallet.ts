@@ -33,6 +33,7 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
     const platFormFeePercent = rawFee ? parseFloat(rawFee) : 0;
 
     try {
+        let amountToReleaseVal = 0;
         const result = await AppDataSource.transaction(async manager => {
             const escrow = await manager.findOne(Escrow, {
                 where: { id: escrowId },
@@ -42,6 +43,8 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 logger.error(`[WALLET_WORKER] Escrow ${escrowId} not found`);
                 throw new Error("Escrow not found");
             }
+
+            amountToReleaseVal = Number(escrow.amount);
 
             // 🔒 lock wallet
             const wallet = await manager.findOne(Wallet, {
@@ -68,7 +71,7 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             }
 
             const currentPending = Number(wallet.pendingAmount);
-            const amountToRelease = Number(escrow.amount);
+            const amountToRelease = amountToReleaseVal;
 
 
             if (currentPending < amountToRelease) {
@@ -119,8 +122,8 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 type: NotificationType.ESCROW_RELEASE,
                 data: {
                     ...result,
-                    grossAmount: amountToRelease,
-                    platformFee: (amountToRelease * platFormFeePercent) / 100
+                    grossAmount: amountToReleaseVal,
+                    platformFee: (amountToReleaseVal * platFormFeePercent) / 100
                 }
             });
     
