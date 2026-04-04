@@ -23,6 +23,8 @@ const notification = new RabbitMQRouter({
 
 const service = new BaseService();
 const pushService = new PushNotificationService();
+console.log('--- [WORKER] 🔔 Notification Queue Worker Ready ---');
+
 
 function getNotificationContent(type: NotificationType, data: any) {
     switch (type) {

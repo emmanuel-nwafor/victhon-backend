@@ -22,7 +22,10 @@ import { Inbox } from "./jobs/Inbox";
 const PORT = env(EnvKey.PORT)!;
 
 (async () => {
-
+    console.log('----------------------------------------------------');
+    console.log('🚀 [DEPLOY_VERIFY] Victhon Backend Version: 1.0.12 (Update: Heartbeat Fix)');
+    console.log(`⏰ [DEPLOY_VERIFY] System Time: ${new Date().toISOString()}`);
+    console.log('----------------------------------------------------');
     try {
 
         redisClient.on("connecting", () => {

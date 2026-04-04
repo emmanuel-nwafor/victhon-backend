@@ -27,6 +27,8 @@ const wallet = new RabbitMQRouter({
     handlers: {}
 });
 
+console.log('--- [WORKER] 💰 Wallet Queue Worker Ready ---');
+
 wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
     const { escrowId, professionalId, walletId } = message.payload;
     const rawFee = env(EnvKey.PLATFORM_FEE_PERCENT);

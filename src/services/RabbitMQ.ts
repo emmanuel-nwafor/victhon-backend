@@ -14,13 +14,30 @@ export class RabbitMQ {
     static async connect() {
         if (!this.connection) {
             try {
+                if (!RabbitMQ.RABBITMQ_URL) {
+                   console.error('[RABBIT_MQ] ❌ ERROR: Missing RABBITMQ_URL in environment configuration!');
+                   return;
+                }
+                
+                console.log(`[RABBIT_MQ] 🏎️  Initializing connection to: ${RabbitMQ.RABBITMQ_URL.split('@')[1]}...`);
                 this.connection = amqp.connect([RabbitMQ.RABBITMQ_URL], {
+                    heartbeatIntervalInSeconds: 30,
                     reconnectTimeInSeconds: 5,
                 });
-                this.connection.on('connect', () => console.log('Connected to RabbitMQ'));
-                this.connection.on('disconnect', (err) => console.error('RabbitMQ disconnected:', err));
+                
+                this.connection.on('connect', () => {
+                   console.log('--- [RABBIT_MQ] ✅ Connected Successfully ---');
+                });
+                
+                this.connection.on('disconnect', (err) => {
+                   console.error('--- [RABBIT_MQ] ❌ Disconnected! ---', err);
+                });
+                
+                this.connection.on('connectFailed', (err) => {
+                   console.error('--- [RABBIT_MQ] ⚠️  Connection Failed! ---', err);
+                });
             } catch (error) {
-                console.error('Failed to connect to RabbitMQ: ', error);
+                console.error('[RABBIT_MQ] 🚨 FATAL during amqp.connect:', error);
             }
         }
     }
