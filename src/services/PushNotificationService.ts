@@ -53,6 +53,7 @@ export default class PushNotificationService {
     const messages: ExpoPushMessage[] = [];
 
     for (const pushToken of tokens) {
+      console.log(`[PUSH_SERVICE] 🔍 Verifying token: ${pushToken.substring(0, 15)}...`);
       // Check that all your push tokens appear to be valid Expo push tokens
       if (!Expo.isExpoPushToken(pushToken)) {
         logger.error(`[PUSH_SERVICE] ❌ Invalid Expo push token: ${pushToken}`);
@@ -60,6 +61,7 @@ export default class PushNotificationService {
         continue;
       }
 
+      console.log(`[PUSH_SERVICE] ✅ Token is valid. Adding to messages...`);
       // Construct a message
       messages.push({
         to: pushToken,
@@ -72,7 +74,7 @@ export default class PushNotificationService {
       });
     }
 
-    console.log(`[PUSH_SERVICE] Preparing to send ${messages.length} notifications...`);
+    console.log(`[PUSH_SERVICE] 📦 Batching ${messages.length} notifications...`);
 
     // Batch the messages to send multiple at once
     let chunks = expo.chunkPushNotifications(messages);
@@ -118,16 +120,18 @@ export default class PushNotificationService {
 
       if (!recipient?.pushToken) {
         logger.warn(`[PUSH_SERVICE] Push token not found for ${userType} ID: ${userId} (${recipient?.email || 'unknown email'})`);
-        console.log(`❌ [PUSH_SERVICE] No pushToken found for ${userType} (${recipient?.email || userId})`);
+        console.warn(`[PUSH_SERVICE] ⚠️  No pushToken found in DB for ${userType} (${recipient?.email || userId}). Cannot send push.`);
         return null;
       }
 
-      console.log(`✅ [PUSH_SERVICE] Found pushToken for ${userType} (${recipient.email}): ${recipient.pushToken.substring(0, 15)}...`);
+      console.log(`[PUSH_SERVICE] 🎫 Found pushToken for ${userType} (${recipient.email}): ${recipient.pushToken.substring(0, 15)}...`);
 
-      return await this.sendNotification(recipient.pushToken, title, body, data);
+      const result = await this.sendNotification(recipient.pushToken, title, body, data);
+      console.log(`[PUSH_SERVICE] 🏁 Send attempt complete for user ${userId}. Result:`, result?.length ? 'SUCCESS' : 'FAILED');
+      return result;
     } catch (error) {
       logger.error(`[PUSH_SERVICE] Error in sendToUser for ${userType} ${userId}:`, error);
-      console.error(`❌ [PUSH_SERVICE] Fatal error sending to user ${userId}:`, error);
+      console.error(`[PUSH_SERVICE] ❌ FATAL ERROR sending to user ${userId}:`, error);
       return null;
     }
   }

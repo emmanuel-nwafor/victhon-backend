@@ -32,28 +32,35 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
     const rawFee = env(EnvKey.PLATFORM_FEE_PERCENT);
     const platFormFeePercent = rawFee ? parseFloat(rawFee) : 0;
 
+    console.log(`[WALLET_WORKER] 📥 RECEIVED WALLET_ESCROW_RELEASE: Escrow=${escrowId}, Pro=${professionalId}, Wallet=${walletId}`);
+
     try {
         let amountToReleaseVal = 0;
         const result = await AppDataSource.transaction(async manager => {
+            console.log(`[WALLET_WORKER] 🔍 Fetching escrow ${escrowId}...`);
             const escrow = await manager.findOne(Escrow, {
                 where: { id: escrowId },
             });
 
             if (!escrow) {
-                logger.error(`[WALLET_WORKER] Escrow ${escrowId} not found`);
+                logger.error(`[WALLET_WORKER] ❌ Escrow ${escrowId} not found`);
+                console.error(`[WALLET_WORKER] ❌ Escrow ${escrowId} not found`);
                 throw new Error("Escrow not found");
             }
 
             amountToReleaseVal = Number(escrow.amount);
+            console.log(`[WALLET_WORKER] 💰 Amount to release: ${amountToReleaseVal}`);
 
             // 🔒 lock wallet
+            console.log(`[WALLET_WORKER] 🔒 Locking wallet ${walletId}...`);
             const wallet = await manager.findOne(Wallet, {
                 where: { id: walletId },
                 lock: { mode: "pessimistic_write" },
             });
 
             if (!wallet) {
-                logger.error(`[WALLET_WORKER] Wallet ${walletId} not found`);
+                logger.error(`[WALLET_WORKER] ❌ Wallet ${walletId} not found`);
+                console.error(`[WALLET_WORKER] ❌ Wallet ${walletId} not found`);
                 throw new Error("Wallet not found");
             }
 
@@ -66,16 +73,19 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             });
 
             if (existingTx) {
-                logger.info(`[WALLET_WORKER] Escrow ${escrowId} already released, skipping.`);
+                logger.info(`[WALLET_WORKER] 🧱 Escrow ${escrowId} already released, skipping.`);
+                console.log(`[WALLET_WORKER] 🧱 Already released, skipping.`);
                 return null;
             }
 
             const currentPending = Number(wallet.pendingAmount);
             const amountToRelease = amountToReleaseVal;
 
+            console.log(`[WALLET_WORKER] 📊 Current State: Pending=${currentPending}, Balance=${wallet.balance}`);
 
             if (currentPending < amountToRelease) {
-                logger.error(`[WALLET_WORKER] Insufficient pending balance for wallet ${walletId}. Required: ${amountToRelease}, Current: ${currentPending}`);
+                logger.error(`[WALLET_WORKER] ❌ Insufficient pending balance. Required: ${amountToRelease}, Current: ${currentPending}`);
+                console.error(`[WALLET_WORKER] ❌ Insufficient pending balance! Required: ${amountToRelease}, Available: ${currentPending}`);
                 throw new Error(`Insufficient pending balance (Required: ${amountToRelease}, Available: ${currentPending})`);
             }
 
@@ -84,11 +94,12 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             const netAmount = Number((amountToRelease - platformFee).toFixed(2));
             const newBalance = Number((Number(wallet.balance) + netAmount).toFixed(2));
 
-            console.log(`[WALLET_WORKER] 📊 Escrow Release Audit:
-              - Gross Amount: ${amountToRelease}
-              - Platform Fee (${platFormFeePercent}%): ${platformFee}
-              - Net to Professional: ${netAmount}
-              - Wallet Balance Update: ${wallet.balance} -> ${newBalance}`);
+            console.log(`[WALLET_WORKER] ➕ CALCULATION:
+              - Gross: ${amountToRelease}
+              - Fee (${platFormFeePercent}%): ${platformFee}
+              - Net: ${netAmount}
+              - Pending: ${currentPending} -> ${newPending}
+              - Balance: ${wallet.balance} -> ${newBalance}`);
 
             await manager.update(
                 Wallet,
@@ -103,19 +114,21 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             const tx = manager.create(Transaction, {
                 professionalId,
                 type: TransactionType.ESCROW_RELEASE,
-                amount: netAmount, // Record the net amount the pro actually receives
+                amount: netAmount,
                 escrow: escrow,
                 wallet: wallet,
                 status: TransactionStatus.SUCCESS,
                 reference: `release_${escrowId}`
             });
 
-            logger.info(`[WALLET_WORKER] ✅ Released net ${netAmount} (Gross: ${amountToRelease}) to pro ${professionalId}`);
+            logger.info(`[WALLET_WORKER] ✅ Successfully updated wallet ${walletId}`);
+            console.log(`[WALLET_WORKER] ✅ Wallet updated successfully.`);
 
             return await manager.save(tx);
         });
 
         if (result) {
+            console.log(`[WALLET_WORKER] 🔔 Triggering notification for professional ${professionalId}...`);
             await notify({
                 userId: professionalId,
                 userType: UserType.PROFESSIONAL,
@@ -127,10 +140,11 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 }
             });
     
-            logger.info(`✅ Escrow released for escrow ${escrowId}`);
+            logger.info(`[WALLET_WORKER] 🏁 FINISHED release for escrow ${escrowId}`);
+            console.log(`[WALLET_WORKER] 🏁 Process complete.`);
         }
     } catch (error) {
-        console.error(error);
+        console.error(`[WALLET_WORKER] 💀 CRITICAL FAILURE:`, error);
     }
 });
 

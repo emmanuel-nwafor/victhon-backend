@@ -66,7 +66,7 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
     const { payload: { provider, data } } = message;
 
     try {
-        console.log(`[NOTIFICATION_WORKER] Processing notification for user: ${data.userId}, type: ${data.userType}, provider: ${provider}`);
+        console.log(`[NOTIFICATION_WORKER] 📥 RECEIVED message from queue: provider=${provider}, type=${data.type}, target_user=${data.userId} (${data.userType})`);
         
         if (provider == "socket" || provider == "push") {
             const userService = new UserService();
@@ -83,6 +83,8 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
                 ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: data.userId } })
                 : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: data.userId } });
 
+            console.log(`[NOTIFICATION_WORKER] 👤 Recipient lookup: ${recipient ? 'FOUND (' + recipient.email + ')' : 'NOT FOUND'}`);
+
             // 1. Save notification to Database
             const newNotification = repo.create({
                 ...userId,
@@ -98,16 +100,17 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             // 2. Handle Socket Notification (Fast)
             if (socketId && provider === "socket") {
                 logger.info(`🏃 Notifying ${data.userType}:${data.userId} via Socket, type:${data.type}`)
-                console.log(`[NOTIFICATION_WORKER] Emitting socket event to ${data.userType} ${data.userId}`);
+                console.log(`[NOTIFICATION_WORKER] 🔌 Emitting socket event to target socket: ${socketId}`);
 
                 const notificationNamespace = io.of(Namespaces.BASE);
                 notificationNamespace.to(socketId).emit("notification", { notification: savedNotification });
             } else if (!socketId && provider === "socket") {
                 logger.info(`📴 User ${data.userId} is offline, skipping Socket`)
-                console.log(`[NOTIFICATION_WORKER] User ${data.userId} is offline, skipping socket emit.`);
+                console.log(`[NOTIFICATION_WORKER] 🔌 User is offline, skipping socket emit.`);
             }
 
-            // 3. Handle Push Notification (Potentially slower, so we catch and log)
+            // 3. Handle Push Notification
+            console.log(`[NOTIFICATION_WORKER] 📱 Checking for push token... (Has token: ${!!recipient?.pushToken})`);
             if (recipient?.pushToken) {
                 try {
                     const { title, body } = getNotificationContent(data.type, data.data);

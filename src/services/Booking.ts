@@ -436,6 +436,7 @@ export default class BookingService extends Service {
 
     public async reviewBooking(bookingId: string, proId: string) {
         try {
+            console.log(`[BOOKING_FLOW] 🔍 Review attempt for booking ${bookingId} by pro ${proId}`);
             const booking = await this.repo.findOne({
                 where: {
                     id: bookingId,
@@ -444,17 +445,28 @@ export default class BookingService extends Service {
                 relations: ["professional", "user"],
             });
 
-            if (!booking)
+            if (!booking) {
+                console.warn(`[BOOKING_FLOW] ⚠️  Booking ${bookingId} not found for pro ${proId}`);
                 return this.responseData(404, true, "Booking was not found");
+            }
+
+            console.log(`[BOOKING_FLOW] 📊 Current Status: ${booking.status}`);
 
             if (
-                ![BookingStatus.ACCEPTED, BookingStatus.REVIEW, BookingStatus.ON_THE_WAY].includes(booking.status)
-            )
+                ![BookingStatus.ACCEPTED, BookingStatus.REVIEW, BookingStatus.ON_THE_WAY].includes(booking.status as any)
+            ) {
+                console.error(`[BOOKING_FLOW] ❌ Invalid status for review: ${booking.status}. Expected one of: ACCEPTED, REVIEW, ON_THE_WAY`);
                 return this.responseData(
                     400,
                     true,
-                    `This booking can't be put for review`,
+                    `This booking can't be put for review (Current status: ${booking.status})`,
                 );
+            }
+
+            if (booking.status === BookingStatus.REVIEW) {
+                console.log(`[BOOKING_FLOW] ℹ️  Booking is already in REVIEW status. Skipping save.`);
+                return this.responseData(200, false, "Booking is already in review", { ...booking, professional: undefined });
+            }
 
             booking.status = BookingStatus.REVIEW;
             const updatedBooking = await this.repo.save(booking);
@@ -554,6 +566,7 @@ export default class BookingService extends Service {
 
     public async completeBooking(bookingId: string, userId: string) {
         try {
+            console.log(`[BOOKING_FLOW] 🏁 Completion attempt for booking ${bookingId} by user ${userId}`);
             const result = await AppDataSource.transaction(async (manager) => {
                 const booking = await manager.findOne(Booking, {
                     where: { id: bookingId, userId },
@@ -565,8 +578,11 @@ export default class BookingService extends Service {
                 });
 
                 if (!booking) {
+                    console.error(`[BOOKING_FLOW] ❌ Booking ${bookingId} not found during completion`);
                     throw new Error("Booking not found");
                 }
+
+                console.log(`[BOOKING_FLOW] 📊 Current Status: ${booking.status}, Escrow: ${booking.escrow?.status}`);
 
                 // Allow completion from REVIEW, ACCEPTED, or ON_THE_WAY status
                 if (
@@ -574,20 +590,24 @@ export default class BookingService extends Service {
                         booking.status,
                     )
                 ) {
+                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Status is ${booking.status}`);
                     throw new Error(`Booking cannot be completed because its current status is '${booking.status}'.`);
                 }
 
                 if (booking.escrow.status !== EscrowStatus.PAID) {
+                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Escrow status is ${booking.escrow.status}`);
                     throw new Error("Booking cannot be completed yet because payment has not been confirmed in escrow. Please ensure payment is successful.");
                 }
 
                 if (booking.escrow.refundStatus !== RefundStatus.NONE) {
+                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Refund status is ${booking.escrow.refundStatus}`);
                     throw new Error(`Booking cannot be completed because a refund is in state: ${booking.escrow.refundStatus}`);
                 }
 
                 booking.status = BookingStatus.COMPLETED;
                 booking.escrow.status = EscrowStatus.RELEASED;
 
+                console.log(`[BOOKING_FLOW] ✅ Saving booking as COMPLETED and escrow as RELEASED`);
                 return await manager.save(booking);
             });
 
@@ -598,12 +618,14 @@ export default class BookingService extends Service {
             };
             const queueName = QueueNames.WALLET;
             const eventType = QueueEvents.WALLET_ESCROW_RELEASE;
+            console.log(`[BOOKING_FLOW] 📤 Publishing WALLET_ESCROW_RELEASE for ${result.id}...`);
             await RabbitMQ.publishToExchange(queueName, eventType, {
                 eventType: eventType,
                 payload,
             });
 
             // Non-blocking notification for successful completion
+            console.log(`[BOOKING_FLOW] 🔔 Queuing completion notifications...`);
             notify({
                 userId: result.userId,
                 userType: UserType.USER,
