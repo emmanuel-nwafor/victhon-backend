@@ -507,6 +507,9 @@ export default class BookingService extends Service {
             if (booking.status !== BookingStatus.ACCEPTED)
                 return this.responseData(400, true, "Booking must be accepted first.");
 
+            if (booking.escrow.status !== EscrowStatus.PAID)
+                return this.responseData(400, true, "You can only start moving after the customer has paid for the booking.");
+
             const hasOnsite = booking.services.some(s => s.onsiteLocationService);
             if (!hasOnsite)
                 return this.responseData(400, true, "This service does not support live tracking.");

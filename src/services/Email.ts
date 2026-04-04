@@ -14,12 +14,12 @@ export default class Email {
 
     constructor() {
         this.transporter = nodemailer.createTransport({
-            host: "smtp.gmail.com",
-            port: 465,
-            secure: true,
+            host: "smtp-relay.brevo.com",
+            port: 587,
+            secure: false, // TLS
             auth: {
                 user: env(EnvKey.SMTP_USER) || 'mirordev@gmail.com',
-                pass: env(EnvKey.SMTP_PASSWORD),
+                pass: env(EnvKey.BREVO_API_KEY) || env(EnvKey.SMTP_PASSWORD),
             },
         });
     }

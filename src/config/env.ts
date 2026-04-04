@@ -31,6 +31,7 @@ export enum EnvKey {
     FLW_REDIRECT_URL = 'flwRedirectUrl',
     EXPO_ACCESS_TOKEN = 'expoAccessToken',
     SMTP_USER = 'smtpUser',
+    BREVO_API_KEY = 'brevoApiKey',
 
 }
 
@@ -64,6 +65,7 @@ export default function env(key: EnvKey): string | undefined {
         [EnvKey.FLW_REDIRECT_URL]: process.env.FLW_REDIRECT_URL!,
         [EnvKey.EXPO_ACCESS_TOKEN]: process.env.EXPO_ACCESS_TOKEN!,
         [EnvKey.SMTP_USER]: process.env.SMTP_USER,
+        [EnvKey.BREVO_API_KEY]: process.env.BREVO_API_KEY,
     };
     return envValues[key];
 }
