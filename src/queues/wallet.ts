@@ -76,9 +76,16 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 throw new Error(`Insufficient pending balance (Required: ${amountToRelease}, Available: ${currentPending})`);
             }
 
-            const newPending = currentPending - amountToRelease;
-            const platformFee = (amountToRelease * platFormFeePercent) / 100;
-            const newBalance = Number(wallet.balance) + (amountToRelease - platformFee);
+            const newPending = Number((currentPending - amountToRelease).toFixed(2));
+            const platformFee = Number(((amountToRelease * platFormFeePercent) / 100).toFixed(2));
+            const netAmount = Number((amountToRelease - platformFee).toFixed(2));
+            const newBalance = Number((Number(wallet.balance) + netAmount).toFixed(2));
+
+            console.log(`[WALLET_WORKER] 📊 Escrow Release Audit:
+              - Gross Amount: ${amountToRelease}
+              - Platform Fee (${platFormFeePercent}%): ${platformFee}
+              - Net to Professional: ${netAmount}
+              - Wallet Balance Update: ${wallet.balance} -> ${newBalance}`);
 
             await manager.update(
                 Wallet,
@@ -86,20 +93,21 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 {
                     pendingAmount: newPending,
                     balance: newBalance,
-                    totalBalance: Number(newPending) + Number(newBalance),
+                    totalBalance: Number((newPending + newBalance).toFixed(2)),
                 }
             );
 
             const tx = manager.create(Transaction, {
                 professionalId,
                 type: TransactionType.ESCROW_RELEASE,
-                amount: amountToRelease,
+                amount: netAmount, // Record the net amount the pro actually receives
                 escrow: escrow,
                 wallet: wallet,
                 status: TransactionStatus.SUCCESS,
+                reference: `release_${escrowId}`
             });
 
-            logger.info(`[WALLET_WORKER] Releasing ${amountToRelease} from pending to balance for pro ${professionalId}`);
+            logger.info(`[WALLET_WORKER] ✅ Released net ${netAmount} (Gross: ${amountToRelease}) to pro ${professionalId}`);
 
             return await manager.save(tx);
         });
@@ -109,7 +117,11 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 userId: professionalId,
                 userType: UserType.PROFESSIONAL,
                 type: NotificationType.ESCROW_RELEASE,
-                data: result
+                data: {
+                    ...result,
+                    grossAmount: amountToRelease,
+                    platformFee: (amountToRelease * platFormFeePercent) / 100
+                }
             });
     
             logger.info(`✅ Escrow released for escrow ${escrowId}`);

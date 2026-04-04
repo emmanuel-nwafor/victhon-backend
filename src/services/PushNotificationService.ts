@@ -55,7 +55,8 @@ export default class PushNotificationService {
     for (const pushToken of tokens) {
       // Check that all your push tokens appear to be valid Expo push tokens
       if (!Expo.isExpoPushToken(pushToken)) {
-        logger.error(`Push token ${pushToken} is not a valid Expo push token`);
+        logger.error(`[PUSH_SERVICE] ❌ Invalid Expo push token: ${pushToken}`);
+        console.error(`[PUSH_SERVICE] ❌ Invalid Expo push token: ${pushToken}`);
         continue;
       }
 
@@ -79,11 +80,13 @@ export default class PushNotificationService {
 
     for (let chunk of chunks) {
       try {
+        console.log(`[PUSH_SERVICE] 📡 Sending chunk of ${chunk.length} messages to Expo...`);
         let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        console.log(`[PUSH_SERVICE] ✅ Received ${ticketChunk.length} tickets from Expo.`);
         tickets.push(...ticketChunk);
       } catch (error) {
-        logger.error('[PUSH_SERVICE] Error sending push notification chunk:', error);
-        console.error('[PUSH_SERVICE] ERROR: Failed to send push chunk to Expo server:', error);
+        logger.error('[PUSH_SERVICE] ❌ Error sending push notification chunk:', error);
+        console.error('[PUSH_SERVICE] ❌ ERROR: Failed to send push chunk to Expo server:', error);
       }
     }
 

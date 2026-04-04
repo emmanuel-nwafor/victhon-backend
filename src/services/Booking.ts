@@ -574,15 +574,15 @@ export default class BookingService extends Service {
                         booking.status,
                     )
                 ) {
-                    throw new Error("Booking cannot be completed");
+                    throw new Error(`Booking cannot be completed because its current status is '${booking.status}'.`);
                 }
 
                 if (booking.escrow.status !== EscrowStatus.PAID) {
-                    throw new Error("Booking has not been paid yet");
+                    throw new Error("Booking cannot be completed yet because payment has not been confirmed in escrow. Please ensure payment is successful.");
                 }
 
                 if (booking.escrow.refundStatus !== RefundStatus.NONE) {
-                    throw new Error("Booking cannot be completed");
+                    throw new Error(`Booking cannot be completed because a refund is in state: ${booking.escrow.refundStatus}`);
                 }
 
                 booking.status = BookingStatus.COMPLETED;
