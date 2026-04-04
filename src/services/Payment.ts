@@ -948,7 +948,7 @@ export default class Payment extends BaseService {
           return this.responseData(400, true, "Bank details are required");
       }
 
-      const reference = `wd_${userId}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      const reference = `wd_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 
       // DB Transaction for local update
       const result = await AppDataSource.transaction(async (manager) => {
@@ -1005,6 +1005,7 @@ export default class Payment extends BaseService {
               transferData.data
           );
       } catch (flwError: any) {
+          const errorMessage = flwError.response?.data?.message || flwError.message || "Transfer initiation failed. Please try again later.";
           logger.error("Flutterwave API failed", flwError.response?.data || flwError.message);
           
           await AppDataSource.transaction(async (manager) => {
@@ -1019,15 +1020,15 @@ export default class Payment extends BaseService {
                   lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
                   failedTx.status = TransactionStatus.FAILED;
                   await manager.save([lockedWallet, failedTx]);
-              }
-          });
-
-          return this.responseData(
-              500,
-              true,
-              "Transfer initiation failed. Please try again later."
-          );
-      }
+               }
+           });
+ 
+           return this.responseData(
+               500,
+               true,
+               errorMessage
+           );
+       }
     } catch (error: any) {
       console.error("Withdrawal failed:", error);
       return this.handleTypeormError(error);
