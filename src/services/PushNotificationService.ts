@@ -19,24 +19,18 @@ export default class PushNotificationService {
   private async getExpo() {
     if (!this.expo || !this.ExpoClass) {
       try {
-        console.log('[PUSH_SERVICE] Initializing Expo SDK...');
-        // Use dynamic import to avoid ERR_REQUIRE_ESM
+        // use dynamic import to avoid ERR_REQUIRE_ESM
         const sdk = await (eval('import("expo-server-sdk")') as Promise<typeof import('expo-server-sdk')>);
         this.ExpoClass = sdk.Expo;
         
         const accessToken = env(EnvKey.EXPO_ACCESS_TOKEN);
         if (accessToken) {
-          console.log('[PUSH_SERVICE] Using EXPO_ACCESS_TOKEN for authentication.');
           this.expo = new sdk.Expo({ accessToken });
         } else {
-          console.warn('[PUSH_SERVICE] No EXPO_ACCESS_TOKEN found. Sending as unauthenticated.');
           this.expo = new sdk.Expo();
         }
-        
-        console.log('[PUSH_SERVICE] Expo SDK initialized successfully.');
       } catch (error) {
-        logger.error('[PUSH_SERVICE] Failed to initialize Expo SDK:', error);
-        console.error('[PUSH_SERVICE] ERROR: Failed to initialize Expo SDK. Push notifications will NOT work.', error);
+        logger.error('Failed to initialize Expo SDK:', error);
         throw error;
       }
     }
@@ -63,15 +57,11 @@ export default class PushNotificationService {
     const messages: ExpoPushMessage[] = [];
 
     for (const pushToken of tokens) {
-      console.log(`[PUSH_SERVICE] 🔍 Verifying token: ${pushToken.substring(0, 15)}...`);
-      // Check that all your push tokens appear to be valid Expo push tokens
+      // check that all push tokens appear to be valid expo push tokens
       if (!Expo.isExpoPushToken(pushToken)) {
-        logger.error(`[PUSH_SERVICE] ❌ Invalid Expo push token: ${pushToken}`);
-        console.error(`[PUSH_SERVICE] ❌ Invalid Expo push token: ${pushToken}`);
+        logger.error(`Invalid Expo push token: ${pushToken}`);
         continue;
       }
-
-      console.log(`[PUSH_SERVICE] ✅ Token is valid. Adding to messages...`);
       // Construct a message
       messages.push({
         to: pushToken,
@@ -84,21 +74,16 @@ export default class PushNotificationService {
       });
     }
 
-    console.log(`[PUSH_SERVICE] 📦 Batching ${messages.length} notifications...`);
-
-    // Batch the messages to send multiple at once
+    // batch the messages to send multiple at once
     let chunks = expo.chunkPushNotifications(messages);
     let tickets: ExpoPushTicket[] = [];
 
     for (let chunk of chunks) {
       try {
-        console.log(`[PUSH_SERVICE] 📡 Sending chunk of ${chunk.length} messages to Expo...`);
         let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        console.log(`[PUSH_SERVICE] ✅ Received ${ticketChunk.length} tickets from Expo.`);
         tickets.push(...ticketChunk);
       } catch (error) {
-        logger.error('[PUSH_SERVICE] ❌ Error sending push notification chunk:', error);
-        console.error('[PUSH_SERVICE] ❌ ERROR: Failed to send push chunk to Expo server:', error);
+        logger.error('Error sending push notification chunk:', error);
       }
     }
 
@@ -118,7 +103,6 @@ export default class PushNotificationService {
     data: any = {}
   ) {
     try {
-      console.log(`[PUSH_SERVICE] Fetching pushToken for ${userType} ID: ${userId}`);
       const repo = AppDataSource.getRepository(
         userType === UserType.PROFESSIONAL ? Professional : User
       );
@@ -129,15 +113,10 @@ export default class PushNotificationService {
       });
 
       if (!recipient?.pushToken) {
-        logger.warn(`[PUSH_SERVICE] Push token not found for ${userType} ID: ${userId} (${recipient?.email || 'unknown email'})`);
-        console.warn(`[PUSH_SERVICE] ⚠️  No pushToken found in DB for ${userType} (${recipient?.email || userId}). Cannot send push.`);
         return null;
       }
 
-      console.log(`[PUSH_SERVICE] 🎫 Found pushToken for ${userType} (${recipient.email}): ${recipient.pushToken.substring(0, 15)}...`);
-
       const result = await this.sendNotification(recipient.pushToken, title, body, data);
-      console.log(`[PUSH_SERVICE] 🏁 Send attempt complete for user ${userId}. Result:`, result?.length ? 'SUCCESS' : 'FAILED');
       return result;
     } catch (error) {
       logger.error(`[PUSH_SERVICE] Error in sendToUser for ${userType} ${userId}:`, error);

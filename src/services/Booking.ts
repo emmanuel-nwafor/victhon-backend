@@ -436,7 +436,6 @@ export default class BookingService extends Service {
 
     public async reviewBooking(bookingId: string, proId: string) {
         try {
-            console.log(`[BOOKING_FLOW] 🔍 Review attempt for booking ${bookingId} by pro ${proId}`);
             const booking = await this.repo.findOne({
                 where: {
                     id: bookingId,
@@ -446,16 +445,12 @@ export default class BookingService extends Service {
             });
 
             if (!booking) {
-                console.warn(`[BOOKING_FLOW] ⚠️  Booking ${bookingId} not found for pro ${proId}`);
                 return this.responseData(404, true, "Booking was not found");
             }
-
-            console.log(`[BOOKING_FLOW] 📊 Current Status: ${booking.status}`);
 
             if (
                 ![BookingStatus.ACCEPTED, BookingStatus.REVIEW, BookingStatus.ON_THE_WAY].includes(booking.status as any)
             ) {
-                console.error(`[BOOKING_FLOW] ❌ Invalid status for review: ${booking.status}. Expected one of: ACCEPTED, REVIEW, ON_THE_WAY`);
                 return this.responseData(
                     400,
                     true,
@@ -464,20 +459,19 @@ export default class BookingService extends Service {
             }
 
             if (booking.status === BookingStatus.REVIEW) {
-                console.log(`[BOOKING_FLOW] ℹ️  Booking is already in REVIEW status. Skipping save.`);
                 return this.responseData(200, false, "Booking is already in review", { ...booking, professional: undefined });
             }
 
             booking.status = BookingStatus.REVIEW;
             const updatedBooking = await this.repo.save(booking);
 
-            // Non-blocking notification
+            // notify user of review status
             notify({
                 userId: booking.userId,
                 userType: UserType.USER,
                 type: NotificationType.REVIEW_BOOKING,
                 data: { ...updatedBooking, user: undefined },
-            }).catch(err => console.error("[BOOKING_FLOW] Failed to queue review notification:", err));
+            }).catch(err => console.error("Failed to queue review notification:", err));
 
             return this.responseData(
                 200,
@@ -520,13 +514,13 @@ export default class BookingService extends Service {
             booking.status = BookingStatus.ON_THE_WAY;
             const updatedBooking = await this.repo.save(booking);
 
-            // Non-blocking notification
+            // notify user that professional is on the way
             notify({
                 userId: booking.userId,
                 userType: UserType.USER,
                 type: NotificationType.ON_THE_WAY,
                 data: { ...updatedBooking, services: undefined },
-            }).catch(err => console.error("[BOOKING_FLOW] Failed to queue start moving notification:", err));
+            }).catch(err => console.error("Failed to queue start moving notification:", err));
 
             return this.responseData(200, false, "Professional is now on the way.", updatedBooking);
         } catch (error) {
@@ -566,7 +560,6 @@ export default class BookingService extends Service {
 
     public async completeBooking(bookingId: string, userId: string) {
         try {
-            console.log(`[BOOKING_FLOW] 🏁 Completion attempt for booking ${bookingId} by user ${userId}`);
             const result = await AppDataSource.transaction(async (manager) => {
                 const booking = await manager.findOne(Booking, {
                     where: { id: bookingId, userId },
@@ -578,33 +571,25 @@ export default class BookingService extends Service {
                 });
 
                 if (!booking) {
-                    console.error(`[BOOKING_FLOW] ❌ Booking ${bookingId} not found during completion`);
                     throw new Error("Booking not found");
                 }
 
-                console.log(`[BOOKING_FLOW] 📊 Current Status: ${booking.status}, Escrow: ${booking.escrow?.status}`);
-
-                // ENFORCE MULTI-STEP: Must be in REVIEW to complete
-                // This ensures the PRO has explicitly marked it as ready.
+                // enforce multi-step: must be in REVIEW to complete
                 if (booking.status !== BookingStatus.REVIEW) {
-                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Status is ${booking.status}. Expected: REVIEW`);
                     throw new Error(`Booking cannot be completed yet. The professional must first mark the service as 'Ready for Review' before you can finalize it.`);
                 }
 
                 if (booking.escrow.status !== EscrowStatus.PAID) {
-                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Escrow status is ${booking.escrow.status}`);
                     throw new Error("Booking cannot be completed yet because payment has not been confirmed in escrow. Please ensure payment is successful.");
                 }
 
                 if (booking.escrow.refundStatus !== RefundStatus.NONE) {
-                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Refund status is ${booking.escrow.refundStatus}`);
                     throw new Error(`Booking cannot be completed because a refund is in state: ${booking.escrow.refundStatus}`);
                 }
 
                 booking.status = BookingStatus.COMPLETED;
                 booking.escrow.status = EscrowStatus.RELEASED;
 
-                console.log(`[BOOKING_FLOW] ✅ Saving booking as COMPLETED and escrow as RELEASED`);
                 return await manager.save(booking);
             });
 
@@ -615,27 +600,25 @@ export default class BookingService extends Service {
             };
             const queueName = QueueNames.WALLET;
             const eventType = QueueEvents.WALLET_ESCROW_RELEASE;
-            console.log(`[BOOKING_FLOW] 📤 Publishing WALLET_ESCROW_RELEASE for ${result.id}...`);
             await RabbitMQ.publishToExchange(queueName, eventType, {
                 eventType: eventType,
                 payload,
             });
 
-            // Non-blocking notification for successful completion
-            console.log(`[BOOKING_FLOW] 🔔 Queuing completion notifications...`);
+            // notify participants of completion
             notify({
                 userId: result.userId,
                 userType: UserType.USER,
                 type: NotificationType.COMPLETED,
                 data: { ...result, professional: undefined, escrow: undefined }
-            }).catch(err => console.error("[BOOKING_FLOW] Failed to notify customer of completion:", err));
+            }).catch(err => console.error("Failed to notify customer of completion:", err));
 
             notify({
                 userId: result.professionalId,
                 userType: UserType.PROFESSIONAL,
                 type: NotificationType.COMPLETED,
                 data: { ...result, professional: undefined, escrow: undefined }
-            }).catch(err => console.error("[BOOKING_FLOW] Failed to notify professional of completion:", err));
+            }).catch(err => console.error("Failed to notify professional of completion:", err));
 
             return this.responseData(
                 200,

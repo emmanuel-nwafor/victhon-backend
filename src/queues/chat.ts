@@ -78,9 +78,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
             socketNamespace.to(socketId).emit("receive-message", newMessage);
             if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-delivered", { messageId: newMessage.id });
 
-            logger.info(`📧 New message for ${receiverType}:${receiverId}`);
-
-            // Send push notification if not actively in chat
+            // send push notification if not actively in chat
             if (!inChat) {
                 const sender = newMessage.senderType === UserType.PROFESSIONAL
                     ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderId } })
@@ -98,8 +96,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                 return;
             }
         } else {
-            logger.info(`📴 ${receiverType}:${receiverId} is offline`);
-
+            // handle offline user
             await AppDataSource.transaction(async (manager) => {
                 const existingInbox = await manager.findOne(Inbox, {
                     where: {
@@ -168,7 +165,6 @@ chat.route(QueueEvents.CHAT_MARK_AS_READ, async (message: any, io: Server) => {
         });
 
         if (!otherParticipant) {
-            logger.error("☠ Other participant not found");
             return;
         }
 
@@ -191,16 +187,11 @@ chat.route(QueueEvents.CHAT_MARK_AS_READ, async (message: any, io: Server) => {
 
         if (senderSocketId) {
             socketNamespace.to(senderSocketId).emit("messages-read", Handler.responseData(false, "Messages read", { chat }));
-            logger.info(
-                `✅📩 Messages read event emitted to ${senderType}:${senderId} for chat${chat.id}`
-            );
         } else {
-            logger.info(
-                `❌ Failed to emit messages-read event: senderSocketId not found ${senderType}:${senderId} for chat:${chat.id}`
-            );
+            logger.info(`Failed to emit messages-read event: senderSocketId not found ${senderType}:${senderId} for chat:${chat.id}`);
         }
     } catch (error) {
-        console.error("CHAT_MARK_AS_READ error: ", error);
+        logger.error("CHAT_MARK_AS_READ error:", error);
 
         service.handleTypeormError(error);
     }
@@ -244,7 +235,7 @@ chat.route(QueueEvents.CHAT_MARK_MESSAGES_AS_READ, async (message: any, io: Serv
             if (socketId) {
                 socketNamespace.to(socketId).emit("messages-read", {
                     readerId: userId,
-                    messageIds, // only messages this sender sent
+                    messageIds,
                 });
             }
         }));
@@ -265,8 +256,7 @@ chat.route(QueueEvents.CHAT_DELETE_MESSAGES, async (message: any, io: Server) =>
 
         await AppDataSource.transaction(async (manager) => {
 
-            logger.info(`💀 Deleting messages for ${userType}:${userId}...`);
-
+            // delete messages and their attachments
             const attachments = await manager
                 .getRepository(MessageAttachment)
                 .createQueryBuilder("attachment")
@@ -283,7 +273,7 @@ chat.route(QueueEvents.CHAT_DELETE_MESSAGES, async (message: any, io: Server) =>
                 senderType: userType
             });
 
-            logger.info(`💀 Messages for ${userType}:${userId} has been deleted successfully`);
+            logger.info(`Messages for ${userType}:${userId} deleted`);
         });
 
         const userService = new UserService();
@@ -432,9 +422,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
             socketNamespace.to(socketId).emit("receive-attachment", newMessage);
             if (senderSocketId) socketNamespace.to(senderSocketId).emit("attachment-delivered", { messageId: newMessage.id });
 
-            logger.info(`📧 New message attachment for ${receiverType}:${receiverId}`);
-
-            // Send push notification if not actively in chat
+            // send push notification if not actively in chat
             if (!inChat) {
                 const sender = newMessage.senderType === UserType.PROFESSIONAL
                     ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: newMessage.senderId } })
@@ -484,9 +472,9 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
                     1
                 );
             });
-            logger.info(`📫 ${receiverType}:${receiverId} message attachment has been added to inbox successfully.`);
+            logger.info(`message attachment added to inbox for ${receiverType}:${receiverId}`);
 
-            // Send push notification when user is offline
+            // send push notification for offline user
             const sender = newMessage.senderType === UserType.PROFESSIONAL
                 ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: newMessage.senderId } })
                 : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: newMessage.senderId } });

@@ -23,7 +23,7 @@ const notification = new RabbitMQRouter({
 
 const service = new BaseService();
 const pushService = new PushNotificationService();
-console.log('--- [WORKER] 🔔 Notification Queue Worker Ready ---');
+console.log('Notification queue worker ready');
 
 
 function getNotificationContent(type: NotificationType, data: any) {
@@ -68,8 +68,6 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
     const { payload: { provider, data } } = message;
 
     try {
-        console.log(`[NOTIFICATION_WORKER] 📥 RECEIVED message from queue: provider=${provider}, type=${data.type}, target_user=${data.userId} (${data.userType})`);
-        
         if (provider == "socket" || provider == "push") {
             const userService = new UserService();
             const proService = new ProfessionalService();
@@ -85,9 +83,7 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
                 ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: data.userId } })
                 : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: data.userId } });
 
-            console.log(`[NOTIFICATION_WORKER] 👤 Recipient lookup: ${recipient ? 'FOUND (' + recipient.email + ')' : 'NOT FOUND'}`);
-
-            // 1. Save notification to Database
+            // save notification to database
             const newNotification = repo.create({
                 ...userId,
                 type: data.type,
@@ -97,28 +93,17 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             });
 
             const savedNotification = await repo.save(newNotification);
-            console.log(`[NOTIFICATION_WORKER] Saved notification ${savedNotification.id} to DB.`);
 
-            // 2. Handle Socket Notification (Fast)
+            // handle socket notification
             if (socketId && provider === "socket") {
-                logger.info(`🏃 Notifying ${data.userType}:${data.userId} via Socket, type:${data.type}`)
-                console.log(`[NOTIFICATION_WORKER] 🔌 Emitting socket event to target socket: ${socketId}`);
-
                 const notificationNamespace = io.of(Namespaces.BASE);
                 notificationNamespace.to(socketId).emit("notification", { notification: savedNotification });
-            } else if (!socketId && provider === "socket") {
-                logger.info(`📴 User ${data.userId} is offline, skipping Socket`)
-                console.log(`[NOTIFICATION_WORKER] 🔌 User is offline, skipping socket emit.`);
             }
 
-            // 3. Handle Push Notification
-            console.log(`[NOTIFICATION_WORKER] 📱 Checking for push token... (Has token: ${!!recipient?.pushToken})`);
+            // handle push notification
             if (recipient?.pushToken) {
                 try {
                     const { title, body } = getNotificationContent(data.type, data.data);
-                    
-                    console.log(`[NOTIFICATION_WORKER] 📱 Sending push to User:${data.userId} (${recipient.email || 'no email'})`);
-                    console.log(`[NOTIFICATION_WORKER] 🎫 Using Token: ${recipient.pushToken.substring(0, 15)}...`);
                     
                     const result = await pushService.sendNotification(recipient.pushToken, title, body, {
                         ...data,
@@ -127,21 +112,12 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
                     
                     console.log(`[NOTIFICATION_WORKER] ✅ Push status for ${data.userId}: ${result?.length ? 'SENT' : 'FAILED'}`);
                 } catch (error) {
-                    logger.error(`❌ [NOTIFICATION_QUEUE] Failed to send push to User:${data.userId}:`, error);
-                    console.error(`[NOTIFICATION_WORKER] ❌ Error sending push to ${data.userId}:`, error);
-                }
-            } else {
-                if (provider === "push") {
-                    logger.warn(`⚠️ [NOTIFICATION_QUEUE] Cannot send push to ${data.userId}: No pushToken found in DB.`);
-                    console.warn(`[NOTIFICATION_WORKER] ⚠️ No pushToken found for ${data.userId} in DB.`);
-                } else {
-                   console.log(`[NOTIFICATION_WORKER] No pushToken found for ${data.userId}, skipping push.`);
+                    logger.error(`Failed to send push to User:${data.userId}:`, error);
                 }
             }
         }
-        console.log(`[NOTIFICATION_WORKER] Finished processing notification for ${data.userId}`);
     } catch (error) {
-        console.error(`[NOTIFICATION_WORKER] FATAL ERROR during message processing:`, error);
+        logger.error(`Error during message processing:`, error);
         service.handleTypeormError(error);
     }
 });
@@ -153,19 +129,16 @@ notification.route(QueueEvents.NOTIFICATION_OFFLINE, async (message: any, io: Se
     try {
 
         if (provider == "socket") {
-
             const userService = new UserService();
             const socketId = await userService.getSocketId(data.userId);
 
             if (socketId) {
-                logger.info(`🏃 Notifying user:${data.userId}, type:${data.type}`)
-
                 const notificationNamespace = io.of(Namespaces.BASE);
                 notificationNamespace.to(socketId).emit("notification", {
-                    notification
+                    notification: data
                 });
             } else {
-                logger.info(`📴 user:${data.userId} is offline`)
+                logger.info(`user:${data.userId} is offline`);
             }
         }
     } catch (error) {

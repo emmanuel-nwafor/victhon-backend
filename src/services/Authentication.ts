@@ -13,6 +13,8 @@ import Service from "./Service";
 import Token from "./Token";
 import { AuthProvider } from "../types/constants";
 import { normalizeEmail } from "../utils/normalizeEmail";
+import Email from "./Email";
+import path from "path";
 
 export default class Authentication extends Service {
   protected readonly storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -45,6 +47,17 @@ export default class Authentication extends Service {
 
     await sendPasswordOTP(email, otp);
     return true;
+  }
+
+  private async sendWelcomeEmail(email: string, name: string) {
+    try {
+      const emailService = new Email();
+      const templatePath = path.join(__dirname, "../views/welcome.ejs");
+      const html = (await emailService.getEmailTemplate({ name }, templatePath)) as string;
+      await emailService.sendEmail("Victhon <no-reply@victhon.co>", email, "Welcome to Victhon!", html);
+    } catch (error) {
+      console.error("Welcome email failed:", error);
+    }
   }
 
   private generateToken(data: any, role: string, expiresIn: string = "100y") {
@@ -114,6 +127,9 @@ export default class Authentication extends Service {
           UserType.USER,
         );
 
+        // send welcome email
+        this.sendWelcomeEmail(savedUser.email, savedUser.firstName || "User");
+
         return this.responseData(201, false, "User has been created successfully", {
           user: { ...savedUser, password: undefined },
           token,
@@ -171,6 +187,9 @@ export default class Authentication extends Service {
           { id: savedPro.id, userType: UserType.PROFESSIONAL },
           UserType.PROFESSIONAL,
         );
+
+        // send welcome email
+        this.sendWelcomeEmail(savedPro.email, savedPro.firstName || "Professional");
 
         return this.responseData(201, false, "Professional has been created successfully", {
           user: {
@@ -584,6 +603,9 @@ export default class Authentication extends Service {
           UserType.USER,
         );
 
+        // send welcome email
+        this.sendWelcomeEmail(savedUser.email, savedUser.firstName || "User");
+
         return this.responseData(200, false, "OTP verified successfully", {
           user: {
             ...savedUser,
@@ -608,6 +630,9 @@ export default class Authentication extends Service {
         { id: savedProfessional.id, userType: UserType.PROFESSIONAL },
         UserType.PROFESSIONAL,
       );
+
+      // send welcome email
+      this.sendWelcomeEmail(savedProfessional.email, savedProfessional.firstName || "Professional");
 
       const coords = (savedProfessional.location as any)
         .replace("POINT(", "")

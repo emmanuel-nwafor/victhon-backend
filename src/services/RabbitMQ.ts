@@ -15,29 +15,28 @@ export class RabbitMQ {
         if (!this.connection) {
             try {
                 if (!RabbitMQ.RABBITMQ_URL) {
-                   console.error('[RABBIT_MQ] ❌ ERROR: Missing RABBITMQ_URL in environment configuration!');
+                   logger.error('Missing RABBITMQ_URL in environment configuration');
                    return;
                 }
                 
-                console.log(`[RABBIT_MQ] 🏎️  Initializing connection to: ${RabbitMQ.RABBITMQ_URL.split('@')[1]}...`);
                 this.connection = amqp.connect([RabbitMQ.RABBITMQ_URL], {
                     heartbeatIntervalInSeconds: 30,
                     reconnectTimeInSeconds: 5,
                 });
                 
                 this.connection.on('connect', () => {
-                   console.log('--- [RABBIT_MQ] ✅ Connected Successfully ---');
+                   logger.info('RabbitMQ connected successfully');
                 });
                 
                 this.connection.on('disconnect', (err) => {
-                   console.error('--- [RABBIT_MQ] ❌ Disconnected! ---', err);
+                   logger.error('RabbitMQ disconnected', err);
                 });
                 
                 this.connection.on('connectFailed', (err) => {
-                   console.error('--- [RABBIT_MQ] ⚠️  Connection Failed! ---', err);
+                   logger.warn('RabbitMQ connection failed', err);
                 });
             } catch (error) {
-                console.error('[RABBIT_MQ] 🚨 FATAL during amqp.connect:', error);
+                logger.error('Error during RabbitMQ connect:', error);
             }
         }
     }
@@ -77,15 +76,8 @@ export class RabbitMQ {
                         QUEUES[queueName]!.routingKeyPattern
                     );
 
-                    // Set prefetch limit
+                    // set prefetch limit
                     await channel.prefetch(RabbitMQ.PREFETCH_COUNT);
-
-                    console.log(
-                        `Channel created for queue: ${queueName}, ` +
-                        `bound to ${QUEUES[queueName]!.exchange} with pattern ${QUEUES[queueName]!.routingKeyPattern}, ` +
-                        `prefetch: ${RabbitMQ.PREFETCH_COUNT}, ` +
-                        `DLX: ${dlxName}, DLQ: ${dlqName}`
-                    );
                 },
             });
             await this.channels[queueName]!.waitForConnect();
@@ -102,7 +94,6 @@ export class RabbitMQ {
             await channel.publish(QUEUES[queueName].exchange, eventType, Buffer.from(JSON.stringify(message)), {
                 persistent: true,
             });
-            console.log(`👍 Message sent to ${QUEUES[queueName].exchange} with routing key ${eventType}`);
             return true;
         } catch (error) {
             console.error('Failed to publish: ', error);
@@ -123,12 +114,11 @@ export class RabbitMQ {
                             const { eventType, payload } = message;
 
                             if (!eventType || !QUEUES[queueName]!.handlers[eventType]) {
-                                console.error(`Unknown eventType: ${eventType} in ${queueName}`);
+                                logger.error(`Unknown eventType: ${eventType} in ${queueName}`);
                                 channel.nack(msg, false, false);
                                 return;
                             }
 
-                            console.log(`👍 Received on ${queueName} [${eventType}]`);
                             await QUEUES[queueName]!.handlers[eventType](message, io);
                             channel.ack(msg);
                         } catch (err) {

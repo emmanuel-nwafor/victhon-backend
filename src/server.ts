@@ -13,31 +13,20 @@ import Payment from "./services/Payment";
 import BookingService from "./services/Booking";
 import { OfflineNotification } from "./jobs/OfflineNotification";
 import { Inbox } from "./jobs/Inbox";
-// import { Notification } from "./queues/NotificationQueue";
-// import { NewBooking } from "./queues/NewBooking";
-// import { UpdateRatingAgg } from "./queues/UpdateRatingAgg";
-// import { NewView } from "./queues/NewView";
-
+import logger from "./config/logger";
 
 const PORT = env(EnvKey.PORT)!;
 
 (async () => {
-    console.log('----------------------------------------------------');
-    console.log('🚀 [DEPLOY_VERIFY] Victhon Backend Version: 1.0.12 (Update: Heartbeat Fix)');
-    console.log(`⏰ [DEPLOY_VERIFY] System Time: ${new Date().toISOString()}`);
-    console.log('----------------------------------------------------');
     try {
-
-        redisClient.on("connecting", () => {
-            console.log("Redis Connecting...");
-        });
+        logger.info(`Starting Victhon Backend on port ${PORT}`);
 
         redisClient.on("connect", () => {
-            console.log('Redis running on port - ', redisClient.options.port);
+            logger.info(`Redis connected on port ${redisClient.options.port}`);
         });
 
         redisClient.on('error', (err) => {
-            console.error('Redis connection error:', err);
+            logger.error('Redis connection error:', err);
         });
 
 
@@ -47,22 +36,21 @@ const PORT = env(EnvKey.PORT)!;
             socket: { reconnectStrategy: retries => Math.min(retries * 50, 500) }  // Exponential backoff
         });
         pubClient.on("error", (err) => {
-            console.error('Redis pubClient connection error:', err);
+            logger.error('Redis pubClient connection error:', err);
         });
 
         const subClient: RedisClientType = pubClient.duplicate();
         subClient.on("error", (err) => {
-            console.error('Redis subClient connection error:', err);
+            logger.error('Redis subClient connection error:', err);
         });
         await Promise.all([pubClient.connect(), subClient.connect()]);
 
 
         await RabbitMQ.connect();
 
-
         await AppDataSource.initialize()
-            .then(() => console.log("✅ DB has connected successfully"))
-            .catch(console.error);
+            .then(() => logger.info("Database connected successfully"))
+            .catch(err => logger.error("Database connection failed", err));
 
         const { server: app, io } = await createApp(pubClient, subClient);
 
@@ -86,9 +74,9 @@ const PORT = env(EnvKey.PORT)!;
             if (IWorker.drained) worker.on('drained', IWorker.drained);
         }
 
-        app.listen(PORT, () => console.log(`Server running on port - ${PORT}\n`));
+        app.listen(PORT, () => logger.info(`Server listening on port ${PORT}`));
     } catch (error) {
-        console.error("Some error happened: ", error)
+        logger.error("Initialization error:", error);
     }
 
 })();

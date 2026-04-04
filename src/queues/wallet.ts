@@ -27,46 +27,40 @@ const wallet = new RabbitMQRouter({
     handlers: {}
 });
 
-console.log('--- [WORKER] 💰 Wallet Queue Worker Ready ---');
+// wallet queue worker
+console.log('Wallet queue worker ready');
 
 wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
     const { escrowId, professionalId, walletId } = message.payload;
     const rawFee = env(EnvKey.PLATFORM_FEE_PERCENT);
     const platFormFeePercent = rawFee ? parseFloat(rawFee) : 0;
 
-    console.log(`[WALLET_WORKER] 📥 RECEIVED WALLET_ESCROW_RELEASE: Escrow=${escrowId}, Pro=${professionalId}, Wallet=${walletId}`);
-
     try {
         let amountToReleaseVal = 0;
         const result = await AppDataSource.transaction(async manager => {
-            console.log(`[WALLET_WORKER] 🔍 Fetching escrow ${escrowId}...`);
             const escrow = await manager.findOne(Escrow, {
                 where: { id: escrowId },
             });
 
             if (!escrow) {
-                logger.error(`[WALLET_WORKER] ❌ Escrow ${escrowId} not found`);
-                console.error(`[WALLET_WORKER] ❌ Escrow ${escrowId} not found`);
+                logger.error(`Escrow ${escrowId} not found`);
                 throw new Error("Escrow not found");
             }
 
             amountToReleaseVal = Number(escrow.amount);
-            console.log(`[WALLET_WORKER] 💰 Amount to release: ${amountToReleaseVal}`);
 
-            // 🔒 lock wallet
-            console.log(`[WALLET_WORKER] 🔒 Locking wallet ${walletId}...`);
+            // lock wallet
             const wallet = await manager.findOne(Wallet, {
                 where: { id: walletId },
                 lock: { mode: "pessimistic_write" },
             });
 
             if (!wallet) {
-                logger.error(`[WALLET_WORKER] ❌ Wallet ${walletId} not found`);
-                console.error(`[WALLET_WORKER] ❌ Wallet ${walletId} not found`);
+                logger.error(`Wallet ${walletId} not found`);
                 throw new Error("Wallet not found");
             }
 
-            // 🧱 idempotency guard
+            // idempotency guard
             const existingTx = await manager.findOne(Transaction, {
                 where: {
                     escrowId,
@@ -75,36 +69,24 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             });
 
             if (existingTx) {
-                logger.info(`[WALLET_WORKER] 🧱 Escrow ${escrowId} already released, skipping.`);
-                console.log(`[WALLET_WORKER] 🧱 Already released, skipping.`);
                 return null;
             }
 
             const currentPending = Number(wallet.pendingAmount) || 0;
             const amountToRelease = Number(amountToReleaseVal) || 0;
 
-            console.log(`[WALLET_WORKER] 📊 Current State: Pending=${currentPending.toFixed(2)}, Balance=${wallet.balance}`);
-
             if (currentPending < amountToRelease) {
-                logger.error(`[WALLET_WORKER] ❌ Insufficient pending balance. Required: ${amountToRelease}, Current: ${currentPending}`);
-                console.error(`[WALLET_WORKER] ❌ Insufficient pending balance! Required: ${amountToRelease}, Available: ${currentPending}`);
+                logger.error(`Insufficient pending balance. Required: ${amountToRelease}, Current: ${currentPending}`);
                 throw new Error(`Insufficient pending balance (Required: ${amountToRelease}, Available: ${currentPending})`);
             }
 
             const newPending = Number((currentPending - amountToRelease).toFixed(2));
             
-            // Calculate fees safely
+            // calculate fees safely
             const feePercent = isNaN(platFormFeePercent) ? 0 : platFormFeePercent;
             const platformFee = Number(((amountToRelease * feePercent) / 100).toFixed(2));
             const netAmount = Number((amountToRelease - platformFee).toFixed(2));
             const newBalance = Number((Number(wallet.balance || 0) + netAmount).toFixed(2));
-
-            console.log(`[WALLET_WORKER] ➕ CALCULATION:
-              - Gross: ${amountToRelease.toFixed(2)}
-              - Fee (${feePercent}%): ${platformFee.toFixed(2)}
-              - Net: ${netAmount.toFixed(2)}
-              - Pending: ${currentPending.toFixed(2)} -> ${newPending.toFixed(2)}
-              - Balance: ${wallet.balance} -> ${newBalance.toFixed(2)}`);
 
             await manager.update(
                 Wallet,
@@ -126,14 +108,12 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 reference: `release_${escrowId}`
             });
 
-            logger.info(`[WALLET_WORKER] ✅ Successfully updated wallet ${walletId}`);
-            console.log(`[WALLET_WORKER] ✅ Wallet updated successfully.`);
-
+            logger.info(`Successfully updated wallet ${walletId}`);
             return await manager.save(tx);
         });
 
         if (result) {
-            console.log(`[WALLET_WORKER] 🔔 Triggering notification for professional ${professionalId}...`);
+            // trigger notification for professional
             await notify({
                 userId: professionalId,
                 userType: UserType.PROFESSIONAL,
