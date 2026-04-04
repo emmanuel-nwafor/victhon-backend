@@ -475,12 +475,20 @@ export default class SocketHandler {
 
     public static async updateLocation(io: Server, socket: ISocket, data: any) {
         const { bookingId, latitude, longitude } = data;
+        const userId = socket.locals.data.id;
+        const userType = socket.locals.data.userType;
+
         if (!bookingId || !latitude || !longitude) {
             return socket.emit("appError", Handler.responseData(true, "Invalid location payload"));
         }
 
         const socketNamespace = io.of(Namespaces.BASE);
-        logger.info(`📍 Location update for booking ${bookingId}: ${latitude}, ${longitude}`);
+        logger.info(`📍 Live tracking for booking ${bookingId}: ${latitude}, ${longitude} by ${userType}:${userId}`);
+
+        // Persist to database if it's a professional
+        if (userType === UserType.PROFESSIONAL) {
+            await SocketHandler.proService.updateProfessionalLocation(userId, latitude, longitude);
+        }
 
         // Broadcast to everyone in the booking room
         socketNamespace.to(`booking_${bookingId}`).emit("location-updated", {

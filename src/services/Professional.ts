@@ -360,4 +360,14 @@ export default class Professional extends Service {
             return this.handleTypeormError(error);
         }
     }
+
+    public async updateProfessionalLocation(professionalId: string, latitude: number, longitude: number) {
+        try {
+            const location = `POINT(${longitude} ${latitude})` as any;
+            await this.repo.update(professionalId, { location });
+            return this.responseData(200, false, "Location updated successfully");
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
 }
