@@ -584,14 +584,11 @@ export default class BookingService extends Service {
 
                 console.log(`[BOOKING_FLOW] 📊 Current Status: ${booking.status}, Escrow: ${booking.escrow?.status}`);
 
-                // Allow completion from REVIEW, ACCEPTED, or ON_THE_WAY status
-                if (
-                    ![BookingStatus.REVIEW, BookingStatus.ACCEPTED, BookingStatus.ON_THE_WAY].includes(
-                        booking.status,
-                    )
-                ) {
-                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Status is ${booking.status}`);
-                    throw new Error(`Booking cannot be completed because its current status is '${booking.status}'.`);
+                // ENFORCE MULTI-STEP: Must be in REVIEW to complete
+                // This ensures the PRO has explicitly marked it as ready.
+                if (booking.status !== BookingStatus.REVIEW) {
+                    console.error(`[BOOKING_FLOW] ❌ Cannot complete. Status is ${booking.status}. Expected: REVIEW`);
+                    throw new Error(`Booking cannot be completed yet. The professional must first mark the service as 'Ready for Review' before you can finalize it.`);
                 }
 
                 if (booking.escrow.status !== EscrowStatus.PAID) {

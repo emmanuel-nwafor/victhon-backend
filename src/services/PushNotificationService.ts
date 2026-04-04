@@ -1,5 +1,6 @@
 import type { Expo as ExpoType, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 import logger from '../config/logger';
+import env, { EnvKey } from '../config/env';
 import { AppDataSource } from '../data-source';
 import { User } from '../entities/User';
 import { Professional } from '../entities/Professional';
@@ -22,7 +23,16 @@ export default class PushNotificationService {
         // Use dynamic import to avoid ERR_REQUIRE_ESM
         const sdk = await (eval('import("expo-server-sdk")') as Promise<typeof import('expo-server-sdk')>);
         this.ExpoClass = sdk.Expo;
-        this.expo = new sdk.Expo();
+        
+        const accessToken = env(EnvKey.EXPO_ACCESS_TOKEN);
+        if (accessToken) {
+          console.log('[PUSH_SERVICE] Using EXPO_ACCESS_TOKEN for authentication.');
+          this.expo = new sdk.Expo({ accessToken });
+        } else {
+          console.warn('[PUSH_SERVICE] No EXPO_ACCESS_TOKEN found. Sending as unauthenticated.');
+          this.expo = new sdk.Expo();
+        }
+        
         console.log('[PUSH_SERVICE] Expo SDK initialized successfully.');
       } catch (error) {
         logger.error('[PUSH_SERVICE] Failed to initialize Expo SDK:', error);

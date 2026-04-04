@@ -78,10 +78,10 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
                 return null;
             }
 
-            const currentPending = Number(wallet.pendingAmount);
-            const amountToRelease = amountToReleaseVal;
+            const currentPending = Number(wallet.pendingAmount) || 0;
+            const amountToRelease = Number(amountToReleaseVal) || 0;
 
-            console.log(`[WALLET_WORKER] 📊 Current State: Pending=${currentPending}, Balance=${wallet.balance}`);
+            console.log(`[WALLET_WORKER] 📊 Current State: Pending=${currentPending.toFixed(2)}, Balance=${wallet.balance}`);
 
             if (currentPending < amountToRelease) {
                 logger.error(`[WALLET_WORKER] ❌ Insufficient pending balance. Required: ${amountToRelease}, Current: ${currentPending}`);
@@ -90,16 +90,19 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             }
 
             const newPending = Number((currentPending - amountToRelease).toFixed(2));
-            const platformFee = Number(((amountToRelease * platFormFeePercent) / 100).toFixed(2));
+            
+            // Calculate fees safely
+            const feePercent = isNaN(platFormFeePercent) ? 0 : platFormFeePercent;
+            const platformFee = Number(((amountToRelease * feePercent) / 100).toFixed(2));
             const netAmount = Number((amountToRelease - platformFee).toFixed(2));
-            const newBalance = Number((Number(wallet.balance) + netAmount).toFixed(2));
+            const newBalance = Number((Number(wallet.balance || 0) + netAmount).toFixed(2));
 
             console.log(`[WALLET_WORKER] ➕ CALCULATION:
-              - Gross: ${amountToRelease}
-              - Fee (${platFormFeePercent}%): ${platformFee}
-              - Net: ${netAmount}
-              - Pending: ${currentPending} -> ${newPending}
-              - Balance: ${wallet.balance} -> ${newBalance}`);
+              - Gross: ${amountToRelease.toFixed(2)}
+              - Fee (${feePercent}%): ${platformFee.toFixed(2)}
+              - Net: ${netAmount.toFixed(2)}
+              - Pending: ${currentPending.toFixed(2)} -> ${newPending.toFixed(2)}
+              - Balance: ${wallet.balance} -> ${newBalance.toFixed(2)}`);
 
             await manager.update(
                 Wallet,
