@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 
 const allowedMimeTypes: string[] = ['image/jpeg', 'image/jpg', 'image/png'];
-const fileSize: number = 3.0 * 1024 * 1024;
+const fileSize: number = 10.0 * 1024 * 1024; // Increased to 10MB to accommodate high-res mobile photos
 
 const typeError = "LIMIT_INVALID_FILE_TYPE";
 
@@ -60,7 +60,7 @@ const audioFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFil
 
 const uploads = (resourceType: ResourceType, maxFiles: number = 100) => {
     let fileFilter = imageFilter;
-    const fileSize = resourceType === ResourceType.IMAGE ? 3.0 * 1024 * 1024 : 50 * 1024 * 1024;
+    const fileSize = resourceType === ResourceType.IMAGE ? 10.0 * 1024 * 1024 : 50 * 1024 * 1024; // 10MB for images
     if (resourceType == ResourceType.PDF) fileFilter = pdfFilter;
     if (resourceType === ResourceType.VIDEO) fileFilter = videoFilter;
     // if (resourceType === ResourceType.AUDIO) fileFilter = audioFilter;
