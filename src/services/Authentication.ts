@@ -14,6 +14,8 @@ import Password from "../utils/Password";
 import Service from "./Service";
 import Token from "./Token";
 import logger from "../config/logger";
+import notify from "./notify";
+import { NotificationType } from "../entities/Notification";
 
 export default class Authentication extends Service {
   protected readonly storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -137,7 +139,15 @@ export default class Authentication extends Service {
         );
 
         // send welcome email
-        this.sendWelcomeEmail(savedUser.email, savedUser.firstName || "User");
+        await this.sendWelcomeEmail(savedUser.email, savedUser.firstName || "User");
+
+        // in-app welcome
+        notify({
+          userId: savedUser.id,
+          userType: UserType.USER,
+          type: NotificationType.WELCOME,
+          data: { name: savedUser.firstName || "User" }
+        });
 
         return this.responseData(201, false, "User has been created successfully", {
           user: { ...savedUser, password: undefined },
@@ -198,7 +208,15 @@ export default class Authentication extends Service {
         );
 
         // send welcome email
-        this.sendWelcomeEmail(savedPro.email, savedPro.firstName || "Professional");
+        await this.sendWelcomeEmail(savedPro.email, savedPro.firstName || "Professional");
+
+        // in-app welcome
+        notify({
+          userId: savedPro.id,
+          userType: UserType.PROFESSIONAL,
+          type: NotificationType.WELCOME,
+          data: { name: savedPro.firstName || "Professional" }
+        });
 
         return this.responseData(201, false, "Professional has been created successfully", {
           user: {
@@ -613,7 +631,15 @@ export default class Authentication extends Service {
         );
 
         // send welcome email
-        this.sendWelcomeEmail(savedUser.email, savedUser.firstName || "User");
+        await this.sendWelcomeEmail(savedUser.email, savedUser.firstName || "User");
+
+        // in-app welcome
+        notify({
+          userId: savedUser.id,
+          userType: UserType.USER,
+          type: NotificationType.WELCOME,
+          data: { name: savedUser.firstName || "User" }
+        });
 
         return this.responseData(200, false, "OTP verified successfully", {
           user: {
@@ -641,7 +667,15 @@ export default class Authentication extends Service {
       );
 
       // send welcome email
-      this.sendWelcomeEmail(savedProfessional.email, savedProfessional.firstName || "Professional");
+      await this.sendWelcomeEmail(savedProfessional.email, savedProfessional.firstName || "Professional");
+
+      // in-app welcome
+      notify({
+        userId: savedProfessional.id,
+        userType: UserType.PROFESSIONAL,
+        type: NotificationType.WELCOME,
+        data: { name: savedProfessional.firstName || "Professional" }
+      });
 
       const coords = (savedProfessional.location as any)
         .replace("POINT(", "")

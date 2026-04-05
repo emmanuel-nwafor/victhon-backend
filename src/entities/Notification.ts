@@ -29,6 +29,7 @@ export enum NotificationType {
     CHAT = "chat",
     ON_THE_WAY = "on_the_way",
     COMPLETED = "completed",
+    WELCOME = "welcome",
 }
 
 export enum NotificationStatus {

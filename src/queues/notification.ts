@@ -59,6 +59,8 @@ function getNotificationContent(type: NotificationType, data: any) {
             return { title: "Refund Failed", body: "An attempt to refund your booking has failed. Please contact support." };
         case NotificationType.REFUNDED_BOOKING:
             return { title: "Booking Refunded", body: "Your booking has been successfully refunded." };
+        case NotificationType.WELCOME:
+            return { title: "Welcome to Victhon!", body: "We're glad to have you here. Explore and book services with ease!" };
         default:
             return { title: "Victhon Update", body: "You have a new notification." };
     }
