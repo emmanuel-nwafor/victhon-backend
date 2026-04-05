@@ -964,14 +964,19 @@ export default class Payment extends BaseService {
       if (!isValid) return this.responseData(400, true, "Invalid PIN");
 
       const existingAccount = await this.accountRepo.findOne({
+          where: { professionalId: userId, isLocked: true },
+      }) || await this.accountRepo.findOne({
           where: { professionalId: userId },
           order: { createdAt: "ASC" }
       });
-
+ 
+      let usedAccount: Account;
+ 
       if (existingAccount) {
           bankCode = existingAccount.bankCode;
           accountNumber = existingAccount.accountNumber;
           narration = `Withdrawal to ${existingAccount.name}`;
+          usedAccount = existingAccount;
       } else {
           if (!accountDetails || !accountDetails.bankCode || !accountDetails.accountNumber) {
               return this.responseData(400, true, "Bank details are required to set up your first withdrawal account.");
@@ -982,13 +987,14 @@ export default class Payment extends BaseService {
               name: accountDetails.accountName || "Professional",
               accountNumber: accountDetails.accountNumber,
               bankCode: accountDetails.bankCode,
-              bankName: accountDetails.bankName || "Unknown Bank"
+              bankName: accountDetails.bankName || "Unknown Bank",
+              isLocked: false // Will be locked after successful initiation
           });
-          await this.accountRepo.save(newAccount);
-
-          bankCode = newAccount.bankCode;
-          accountNumber = newAccount.accountNumber;
-          narration = `Withdrawal to ${newAccount.name}`;
+          usedAccount = await this.accountRepo.save(newAccount);
+ 
+          bankCode = usedAccount.bankCode;
+          accountNumber = usedAccount.accountNumber;
+          narration = `Withdrawal to ${usedAccount.name}`;
       }
 
       const reference = `wd_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -1040,7 +1046,13 @@ export default class Payment extends BaseService {
           if (transferData?.status !== "success") {
               throw new Error(transferData?.message ?? "Transfer initiation failed");
           }
-
+ 
+          // Lock the account after successful initiation
+          if (!usedAccount.isLocked) {
+              await this.accountRepo.update({ id: usedAccount.id }, { isLocked: true });
+              logger.info(`🔒 Account ${usedAccount.id} has been locked for security after first withdrawal.`);
+          }
+ 
           return this.responseData(
               200,
               false,

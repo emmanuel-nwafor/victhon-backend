@@ -13,6 +13,7 @@ import OfflineNotification from "../../services/OfflineNotification";
 import Inbox from "../../services/Inbox";
 import { Not } from "typeorm";
 import ChatEntity from "../../entities/ChatEntity";
+import { NotificationType } from "../../entities/Notification";
 
 
 interface SendMessagePayload {
@@ -172,6 +173,54 @@ export default class SocketHandler {
                     eventType: QueueEvents.CHAT_RECEIVE_MESSAGE,
                     payload: { newMessage, receiverId, receiverType, senderId },
                 });
+ 
+                // --- PUSH/EMAIL NOTIFICATION LOGIC ---
+                const room = `chat_${chatId}`;
+                const socketNamespace = io.of(Namespaces.BASE);
+                const socketsInRoom = await socketNamespace.in(room).fetchSockets();
+                const isReceiverInRoom = (socketsInRoom as any[]).some(s => s.locals?.data?.id === receiverId);
+ 
+                if (!isReceiverInRoom) {
+                    logger.info(`🔔 Receiver ${receiverType}:${receiverId} is NOT in chat room. Sending Push/Email.`);
+                    
+                    // 1. Sending Push Notification
+                    const senderName = senderType === UserType.PROFESSIONAL 
+                        ? `${chatParticipant.professional?.firstName} ${chatParticipant.professional?.lastName}`
+                        : "Victhon User"; // We'd ideally pull User full name too
+ 
+                    const pushData = {
+                        userId: receiverId,
+                        userType: receiverType,
+                        type: "chat",
+                        title: `New message from ${senderName}`,
+                        body: content.length > 50 ? `${content.substring(0, 47)}...` : content,
+                        data: { chatId, senderId, senderType }
+                    };
+ 
+                    const notify = require("../../services/notify").default;
+                    const { NotificationProvider } = require("../../services/notify");
+                    
+                    // Queue Push and Email
+                    notify(pushData, NotificationProvider.PUSH).catch((err: any) => logger.error("Push notify error:", err));
+                    notify(pushData, NotificationProvider.Email).catch((err: any) => logger.error("Email notify error:", err));
+
+                    // 2. In-App Notification (Socket)
+                    const receiverSocketId = receiverType === UserType.PROFESSIONAL 
+                        ? await SocketHandler.proService.getSocketId(receiverId)
+                        : await SocketHandler.userService.getSocketId(receiverId);
+                    
+                    if (receiverSocketId) {
+                        io.of(Namespaces.BASE).to(receiverSocketId).emit("notification", {
+                            notification: {
+                                type: NotificationType.CHAT,
+                                data: { ...pushData.data, content },
+                                title: pushData.title,
+                                body: pushData.body,
+                                createdAt: new Date()
+                            }
+                        });
+                    }
+                }
             }
         } catch (error) {
             console.error("sendMessage error:", error);

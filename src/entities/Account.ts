@@ -31,6 +31,9 @@ export class Account {
     @Column({ type: 'text' })
     bankCode: string;
 
+    @Column({ type: 'boolean', default: false })
+    isLocked: boolean;
+ 
     @Column()
     professionalId: string;
 

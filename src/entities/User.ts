@@ -6,11 +6,14 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     OneToMany,
+    OneToOne,
+    JoinColumn,
 } from 'typeorm';
 import ChatParticipant from "./ChatParticipant";
 import { Review } from "./Review";
 import { Transaction } from "./Transaction";
 import { AuthProvider } from "../types/constants";
+import { Setting } from "./SettingEntity";
 
 export interface PhotoField {
     url: string;
@@ -64,6 +67,12 @@ export class User {
 
     @OneToMany(() => Transaction, (transaction) => transaction.user)
     transactions: Transaction[];
+ 
+    @OneToOne(() => Setting, (setting) => setting.user, {
+        cascade: true,
+        eager: false,
+    })
+    setting: Setting;
 
     @CreateDateColumn()
     createdAt: Date;
