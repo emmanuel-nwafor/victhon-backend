@@ -83,7 +83,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use("/api/v1/reviews", review);
     app.use("/api/v1/payments", payment);
     app.use("/api/v1/chats", chat);
-    app.use("/api/v1/settings", setting);
+    app.use("/api/v1/settings", verifyJWT([UserType.PROFESSIONAL]), setting);
     app.use("/api/v1/professionals/wallets", verifyJWT([UserType.PROFESSIONAL]), wallet);
 
 
