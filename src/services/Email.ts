@@ -1,5 +1,4 @@
 import { BrevoClient } from "@getbrevo/brevo";
-import path from "path";
 import env, { EnvKey } from "../config/env";
 import logger from "../config/logger";
 
@@ -15,14 +14,11 @@ export default class Email {
     if (!apiKey) {
       logger.warn("BREVO_API_KEY is not set. Email service will not function.");
     }
-    this.client = new BrevoClient({
-      apiKey: apiKey || "",
-    });
+    this.client = new BrevoClient({ apiKey: apiKey || "" });
   }
 
   /**
-   * Core Wrapper: High-contrast hero layout inspired by modern SaaS templates.
-   * Provides a "Free" look by using a clean white background and bold headers.
+   * Core email wrapper with optional green hero banner.
    */
   private emailWrapper(content: string, heroTitle?: string) {
     return `
@@ -32,11 +28,9 @@ export default class Email {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #ffffff; }
-          .main-container { width: 100%; max-width: 700px; margin: 0 auto; }
-          .stack-column { display: block; width: 100%; vertical-align: middle; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #ffffff; }
+          .main-container { width: 100%; max-width: 680px; margin: 0 auto; }
           @media screen and (max-width: 600px) {
-            .column-mobile { width: 100% !important; display: block !important; padding: 15px 0 !important; }
             .content-area { padding: 40px 20px !important; }
             .hero-text { font-size: 32px !important; }
           }
@@ -44,31 +38,35 @@ export default class Email {
       </head>
       <body>
         <div class="main-container">
+
+          <!-- Logo -->
           <div style="padding: 24px 40px;">
             <img src="${this.LOGO_URL}" alt="Victhon" width="32" style="display: block;" />
           </div>
 
+          <!-- Hero Banner (conditional) -->
           ${heroTitle ? `
-          <div style="background-color: ${this.BRAND_GREEN}; padding: 70px 40px; color: #ffffff;">
-            <h1 class="hero-text" style="margin: 0; font-size: 46px; font-weight: 800; line-height: 1.1; letter-spacing: -1.5px;">
-              ${heroTitle}
-            </h1>
+          <div style="background-color: ${this.BRAND_GREEN}; padding: 64px 40px;">
+            <h1 class="hero-text" style="margin: 0; font-size: 44px; font-weight: 800; color: #ffffff; line-height: 1.1; letter-spacing: -1.5px;">${heroTitle}</h1>
           </div>
-          ` : ''}
+          ` : ""}
 
-          <div class="content-area" style="padding: 60px 40px;">
+          <!-- Body Content -->
+          <div class="content-area" style="padding: 56px 40px;">
             ${content}
           </div>
 
-          <div style="padding: 50px 40px; border-top: 1px solid #f1f5f9; text-align: center;">
-             <div style="margin-bottom: 24px;">
-                <a href="#" style="margin: 0 10px; text-decoration: none;"><img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png" width="18" style="opacity: 0.4;"></a>
-                <a href="#" style="margin: 0 10px; text-decoration: none;"><img src="https://cdn-icons-png.flaticon.com/512/3256/3256013.png" width="18" style="opacity: 0.4;"></a>
-                <a href="#" style="margin: 0 10px; text-decoration: none;"><img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="18" style="opacity: 0.4;"></a>
-             </div>
-             <p style="font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin: 0;">Follow Us On</p>
-             <p style="font-size: 11px; color: #cbd5e1; margin-top: 15px;">&copy; ${this.YEAR} Victhon Ecosystems. All rights reserved.</p>
+          <!-- Footer -->
+          <div style="padding: 40px; border-top: 1px solid #f1f5f9; text-align: center;">
+            <div style="margin-bottom: 20px;">
+              <a href="https://instagram.com/victhon" style="margin: 0 8px; text-decoration: none;"><img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png" width="18" style="opacity: 0.4;" alt="IG"></a>
+              <a href="https://twitter.com/victhon" style="margin: 0 8px; text-decoration: none;"><img src="https://cdn-icons-png.flaticon.com/512/3256/3256013.png" width="18" style="opacity: 0.4;" alt="X"></a>
+              <a href="https://facebook.com/victhon" style="margin: 0 8px; text-decoration: none;"><img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="18" style="opacity: 0.4;" alt="FB"></a>
+            </div>
+            <p style="font-size: 12px; color: #94a3b8; margin: 0;">&copy; ${this.YEAR} Victhon.co. All rights reserved.</p>
+            <p style="font-size: 11px; color: #cbd5e1; margin: 8px 0 0;">If you didn't expect this email, you can safely ignore it.</p>
           </div>
+
         </div>
       </body>
       </html>
@@ -91,155 +89,173 @@ export default class Email {
     }
   }
 
+  // ─── Welcome Email ────────────────────────────────────────────────────────────
+
   public async sendWelcomeEmail(email: string, name: string) {
     const images = [
       "https://i.pinimg.com/1200x/c3/c7/35/c3c735c3d76c5ab378c5d4f80b8ca632.jpg",
       "https://i.pinimg.com/1200x/c2/02/3a/c2023a189dc06d49885d7e314bffd751.jpg",
-      "https://i.pinimg.com/1200x/97/31/02/973102b2429ee16287e6775a1497c22e.jpg"
+      "https://i.pinimg.com/1200x/97/31/02/973102b2429ee16287e6775a1497c22e.jpg",
     ];
 
-    const welcomeContent = `
-      <p style="font-size: 19px; color: #475569; line-height: 1.6; margin-bottom: 60px;">
-        Hello ${name}, welcome to the ecosystem. Victhon is more than a platform—it’s a commitment to professional excellence. We understand the friction of modern service delivery, and we’ve built the solution.
+    // Images are capped at 200px height with cover to prevent tall distortion
+    const imgCss = "display: block; border-radius: 12px; width: 100%; height: 200px; object-fit: cover; object-position: center;";
+
+    const html = `
+      <p style="font-size: 17px; color: #475569; line-height: 1.7; margin: 0 0 56px;">
+        Hi <strong style="color: #0f172a;">${name}</strong>, welcome to Victhon — a platform built to connect everyday people with skilled, vetted professionals for any service they need, right in their city.
       </p>
 
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 70px;">
-        <tr>
-          <td class="column-mobile" width="55%" style="vertical-align: middle;">
-            <h2 style="margin: 0 0 15px; font-size: 26px; color: #0f172a; font-weight: 800; letter-spacing: -0.5px;">Precision Matching</h2>
-            <p style="margin: 0; font-size: 16px; color: #64748b; line-height: 1.8; padding-right: 30px;">
-              Our vetting process is relentless. We curate a network of professionals who aren't just "available," but are the absolute top-tier in their respective fields.
-            </p>
-          </td>
-          <td class="column-mobile" width="45%">
-            <img src="${images[0]}" width="100%" style="border-radius: 4px; display: block;" alt="Talent" />
-          </td>
-        </tr>
+      <!-- Feature 1: Browse & Book -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 56px;">
+        <tr><td style="padding-bottom: 16px;">
+          <img src="${images[0]}" alt="Browse professionals" style="${imgCss}" />
+        </td></tr>
+        <tr><td>
+          <p style="margin: 0 0 6px; font-size: 11px; font-weight: 700; color: ${this.BRAND_GREEN}; text-transform: uppercase; letter-spacing: 2px;">Browse &amp; Book</p>
+          <h2 style="margin: 0 0 10px; font-size: 20px; color: #0f172a; font-weight: 800; letter-spacing: -0.3px;">Find a Professional Near You</h2>
+          <p style="margin: 0; font-size: 15px; color: #64748b; line-height: 1.7;">
+            Need a cleaner, electrician, plumber, tailor or any other skilled hand? Browse verified provider profiles, check their ratings and reviews, and book in minutes — all within the app.
+          </p>
+        </td></tr>
       </table>
 
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 70px;">
-        <tr>
-          <td class="column-mobile" width="45%">
-            <img src="${images[1]}" width="100%" style="border-radius: 4px; display: block;" alt="Work" />
-          </td>
-          <td class="column-mobile" width="55%" style="vertical-align: middle;">
-            <div style="padding-left: 30px;" class="column-mobile">
-              <h2 style="margin: 0 0 15px; font-size: 26px; color: #0f172a; font-weight: 800; letter-spacing: -0.5px;">Centralized Clarity</h2>
-              <p style="margin: 0; font-size: 16px; color: #64748b; line-height: 1.8;">
-                From high-fidelity file transfers to real-time milestone tracking, our dashboard ensures you spend less time managing and more time building.
-              </p>
-            </div>
-          </td>
-        </tr>
+      <!-- Feature 2: Real-Time Chat -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 56px;">
+        <tr><td style="padding-bottom: 16px;">
+          <img src="${images[1]}" alt="Chat with providers" style="${imgCss}" />
+        </td></tr>
+        <tr><td>
+          <p style="margin: 0 0 6px; font-size: 11px; font-weight: 700; color: ${this.BRAND_GREEN}; text-transform: uppercase; letter-spacing: 2px;">Real-Time Chat</p>
+          <h2 style="margin: 0 0 10px; font-size: 20px; color: #0f172a; font-weight: 800; letter-spacing: -0.3px;">Communicate Before You Commit</h2>
+          <p style="margin: 0; font-size: 15px; color: #64748b; line-height: 1.7;">
+            Every booking starts with a conversation. Use our built-in messaging to discuss your job, share photos, agree on details, and align expectations — all before any money changes hands.
+          </p>
+        </td></tr>
       </table>
 
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 80px;">
-        <tr>
-          <td class="column-mobile" width="55%" style="vertical-align: middle;">
-            <h2 style="margin: 0 0 15px; font-size: 26px; color: #0f172a; font-weight: 800; letter-spacing: -0.5px;">Escrow Protection</h2>
-            <p style="margin: 0; font-size: 16px; color: #64748b; line-height: 1.8; padding-right: 30px;">
-              Trust is built into the code. Our automated escrow system holds capital securely, releasing it only when you’ve verified that the work meets your standard.
-            </p>
-          </td>
-          <td class="column-mobile" width="45%">
-            <img src="${images[2]}" width="100%" style="border-radius: 4px; display: block;" alt="Security" />
-          </td>
-        </tr>
+      <!-- Feature 3: Escrow Payments -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 56px;">
+        <tr><td style="padding-bottom: 16px;">
+          <img src="${images[2]}" alt="Secure payments" style="${imgCss}" />
+        </td></tr>
+        <tr><td>
+          <p style="margin: 0 0 6px; font-size: 11px; font-weight: 700; color: ${this.BRAND_GREEN}; text-transform: uppercase; letter-spacing: 2px;">Safe Payments</p>
+          <h2 style="margin: 0 0 10px; font-size: 20px; color: #0f172a; font-weight: 800; letter-spacing: -0.3px;">Pay with Full Confidence</h2>
+          <p style="margin: 0; font-size: 15px; color: #64748b; line-height: 1.7;">
+            Your money is always protected. Victhon holds payments in secure escrow and only releases funds to the provider once you confirm the job is done to your satisfaction. No disputes, no stress.
+          </p>
+        </td></tr>
       </table>
 
-      <div style="background-color: #fcfcfc; border: 1px solid #f1f5f9; border-radius: 16px; padding: 45px; text-align: left;">
-        <h3 style="margin: 0 0 15px; color: #0f172a; font-size: 22px; font-weight: 800;">Getting Started</h3>
-        <p style="margin: 0 0 20px; font-size: 16px; color: #475569; line-height: 1.8;">
-          Your workspace is ready for you. We recommend completing your profile to unlock our advanced matching features. By detailing your specific requirements, you allow our system to pinpoint the perfect collaborators for your next big project.
+      <!-- CTA -->
+      <div style="text-align: center; margin-bottom: 56px;">
+        <a href="https://victhon.co" style="display: inline-block; padding: 16px 44px; background-color: ${this.BRAND_GREEN}; color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px;">
+          Start Exploring Victhon
+        </a>
+      </div>
+
+      <!-- Sign-off -->
+      <div style="border-top: 1px solid #f1f5f9; padding-top: 32px;">
+        <p style="margin: 0; font-size: 14px; color: #94a3b8; line-height: 1.6;">
+          Need help getting started? Reach us at <a href="mailto:support@victhon.co" style="color: ${this.BRAND_GREEN}; text-decoration: none;">support@victhon.co</a>
         </p>
-        <p style="margin: 0 0 20px; font-size: 16px; color: #475569; line-height: 1.8;">
-          We are here to support your growth. If you have any questions or need a personal walkthrough of our enterprise features, simply reply to this email.
-        </p>
-        <p style="margin: 40px 0 0; font-size: 16px; font-weight: 800; color: #0f172a;">Respectfully,</p>
-        <p style="margin: 5px 0 0; font-size: 16px; color: ${this.BRAND_GREEN}; font-weight: 700;">The Victhon Team</p>
+        <p style="margin: 16px 0 0; font-size: 15px; font-weight: 700; color: #0f172a;">The Victhon Team</p>
       </div>
     `;
 
-    return this.sendEmail(email, "Welcome to Victhon", welcomeContent, "The future of service starts here.");
+    return this.sendEmail(email, "Welcome to Victhon — Let's get you started", html, `Welcome, ${name}.`);
   }
+
+  // ─── OTP: Account Verification ───────────────────────────────────────────────
 
   public async sendOTP(email: string, otp: string) {
     const html = `
-      <div style="text-align: left;">
-        <h2 style="margin: 0 0 15px; font-size: 24px; color: #0f172a; font-weight: 800;">Verify your account</h2>
-        <p style="font-size: 16px; color: #475569; line-height: 1.7; margin-bottom: 30px;">
-          To ensure the security of your Victhon ecosystem account, we require a quick verification. 
-          Please enter the unique six-digit synchronization code provided below into the verification 
-          prompt on our platform. 
-        </p>
-        
-        <div style="background-color: #f0fdf4; border: 1px solid #dcfce7; padding: 40px; border-radius: 16px; display: inline-block; width: 100%; box-sizing: border-box; text-align: left;">
-          <p style="margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 2px;">Your Verification Code</p>
-          <span style="font-family: 'Courier New', Courier, monospace; font-size: 52px; font-weight: 800; letter-spacing: 12px; color: ${this.BRAND_GREEN}; line-height: 1;">${otp}</span>
-        </div>
+      <h2 style="margin: 0 0 15px; font-size: 24px; color: #0f172a; font-weight: 800;">Verify your account</h2>
+      <p style="font-size: 16px; color: #475569; line-height: 1.7; margin-bottom: 30px;">
+        To ensure the security of your Victhon account, please enter the 6-digit code below on the verification screen. This code expires in <strong>10 minutes</strong>.
+      </p>
 
-        <div style="margin-top: 30px;">
-          <p style="font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 10px;">
-            <strong>Note:</strong> This code is strictly time-sensitive and will expire in 10 minutes. 
-            For your protection, never share this code with anyone, including members of the Victhon support team.
-          </p>
-          <p style="font-size: 14px; color: #94a3b8;">
-            If you did not initiate this request, you can safely ignore this email or contact our security 
-            ops team if you suspect unauthorized access.
-          </p>
-        </div>
+      <div style="background-color: #f0fdf4; border: 1px solid #dcfce7; padding: 36px; border-radius: 16px; margin-bottom: 28px;">
+        <p style="margin: 0 0 10px; font-size: 12px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 2px;">Your Verification Code</p>
+        <span style="font-family: 'Courier New', Courier, monospace; font-size: 48px; font-weight: 800; letter-spacing: 10px; color: ${this.BRAND_GREEN}; line-height: 1;">${otp}</span>
       </div>
+
+      <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+        <strong>Security notice:</strong> Never share this code with anyone — including Victhon support. If you didn't request this, you can safely ignore this email.
+      </p>
     `;
-    return this.sendEmail(email, "Verify your email — Victhon", html, "Security Synchronization");
+    return this.sendEmail(email, "Verify your email — Victhon", html, "Verify Your Account");
   }
+
+  // ─── OTP: Password Reset ──────────────────────────────────────────────────────
 
   public async sendPasswordOTP(email: string, otp: string) {
     const html = `
-      <div style="text-align: center;">
-        <p style="font-size: 18px; color: #475569; margin-bottom: 40px;">We received a request to reset your password. If this was you, use the code below:</p>
-        <div style="background-color: #f8fafc; border: 2px dashed #e2e8f0; padding: 50px 20px; border-radius: 16px; display: inline-block; width: 100%; box-sizing: border-box;">
-          <span style="font-family: 'Courier New', Courier, monospace; font-size: 52px; font-weight: 800; letter-spacing: 15px; color: #0f172a;">${otp}</span>
-        </div>
-        <p style="margin-top: 40px; font-size: 14px; color: #94a3b8;">If you didn't request this, please ignore this email.</p>
+      <p style="font-size: 16px; color: #475569; line-height: 1.7; margin: 0 0 30px;">
+        We received a request to reset the password on your Victhon account. Use the code below to proceed. It expires in <strong>10 minutes</strong>.
+      </p>
+
+      <div style="background-color: #f8fafc; border: 2px dashed #e2e8f0; padding: 36px; border-radius: 16px; margin-bottom: 28px; text-align: center;">
+        <span style="font-family: 'Courier New', Courier, monospace; font-size: 48px; font-weight: 800; letter-spacing: 12px; color: #0f172a; line-height: 1;">${otp}</span>
       </div>
+
+      <p style="font-size: 13px; color: #94a3b8;">If you didn't request this, your account is safe — you can ignore this email.</p>
     `;
     return this.sendEmail(email, "Reset your password — Victhon", html, "Password Reset");
   }
 
+  // ─── OTP: Transaction PIN Reset ───────────────────────────────────────────────
+
   public async sendPinResetOTP(email: string, otp: string) {
     const html = `
-      <div style="text-align: center;">
-        <p style="font-size: 18px; color: #475569; margin-bottom: 40px;">Your security is our priority. Enter this code to reset your transaction PIN:</p>
-        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 50px 20px; border-radius: 16px; display: inline-block; width: 100%; box-sizing: border-box;">
-          <p style="margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 2px;">Verification Code</p>
-          <span style="font-family: 'Courier New', Courier, monospace; font-size: 52px; font-weight: 800; letter-spacing: 15px; color: ${this.BRAND_GREEN};">${otp}</span>
-        </div>
+      <p style="font-size: 16px; color: #475569; line-height: 1.7; margin: 0 0 30px;">
+        We received a request to reset the Transaction PIN on your Victhon provider account. Enter the code below to confirm it was you. Expires in <strong>10 minutes</strong>.
+      </p>
+
+      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 36px; border-radius: 16px; margin-bottom: 28px; text-align: center;">
+        <p style="margin: 0 0 10px; font-size: 12px; font-weight: 700; color: #15803d; text-transform: uppercase; letter-spacing: 2px;">PIN Reset Code</p>
+        <span style="font-family: 'Courier New', Courier, monospace; font-size: 48px; font-weight: 800; letter-spacing: 12px; color: ${this.BRAND_GREEN}; line-height: 1;">${otp}</span>
+      </div>
+
+      <div style="padding: 16px 20px; background-color: #fefce8; border: 1px solid #fde047; border-radius: 8px;">
+        <p style="margin: 0; font-size: 13px; color: #92400e;">
+          ⚠️ <strong>Never share this code with anyone</strong>, including Victhon support. If you did not initiate this request, contact us immediately at <a href="mailto:support@victhon.co" style="color: #92400e;">support@victhon.co</a>.
+        </p>
       </div>
     `;
     return this.sendEmail(email, "Transaction PIN Reset — Victhon", html, "Secure PIN Reset");
   }
 
+  // ─── Admin Credentials ────────────────────────────────────────────────────────
+
   public async sendAdminCredentials(email: string, name: string, password: string) {
     const html = `
-      <h2 style="margin: 0 0 20px; font-size: 24px; color: #0f172a;">Administrative Access Granted</h2>
-      <p style="margin: 0 0 30px; font-size: 16px; color: #475569;">Hello ${name}, your Super Admin account for Victhon is ready. Please secure these credentials immediately.</p>
-      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 30px; margin-bottom: 40px;">
-        <p style="margin: 0 0 15px; font-size: 15px; color: #64748b;"><strong>Access Email:</strong> ${email}</p>
-        <p style="margin: 0; font-size: 15px; color: #64748b;"><strong>Temporary Key:</strong> <code style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px; color: #0f172a;">${password}</code></p>
+      <h2 style="margin: 0 0 16px; font-size: 22px; color: #0f172a; font-weight: 800;">Administrative Access Granted</h2>
+      <p style="margin: 0 0 28px; font-size: 16px; color: #475569; line-height: 1.6;">
+        Hello ${name}, your Super Admin account for Victhon is ready. Please secure these credentials immediately and change your password on first login.
+      </p>
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px; margin-bottom: 36px;">
+        <p style="margin: 0 0 12px; font-size: 14px; color: #64748b;"><strong>Email:</strong> ${email}</p>
+        <p style="margin: 0; font-size: 14px; color: #64748b;"><strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 3px 8px; border-radius: 4px; color: #0f172a;">${password}</code></p>
       </div>
-      <a href="https://admin.victhon.co/login" style="display: block; text-align: center; padding: 20px; background-color: ${this.BRAND_GREEN}; color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px;">Access Admin Dashboard</a>
+      <a href="https://admin.victhon.co/login" style="display: block; text-align: center; padding: 18px; background-color: ${this.BRAND_GREEN}; color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px;">Access Admin Dashboard</a>
     `;
     return this.sendEmail(email, "Your Super Admin Account — Victhon", html, "Welcome, Administrator");
   }
 
+  // ─── Chat Notification ────────────────────────────────────────────────────────
+
   public async sendChatNotification(email: string, receiverName: string, senderName: string, content: string | null) {
     const html = `
-      <p style="margin: 0 0 30px; font-size: 17px; color: #475569;">Hi ${receiverName}, <strong>${senderName}</strong> just reached out to you:</p>
-      <div style="background-color: #f8fafc; border-left: 6px solid ${this.BRAND_GREEN}; padding: 30px; border-radius: 4px 16px 16px 4px; margin-bottom: 40px;">
-        <p style="margin: 0; font-size: 16px; color: #334155; line-height: 1.6; font-style: italic;">"${content || 'Sent an attachment...'}"</p>
+      <p style="margin: 0 0 28px; font-size: 16px; color: #475569; line-height: 1.6;">
+        Hi ${receiverName}, <strong style="color: #0f172a;">${senderName}</strong> just sent you a message on Victhon:
+      </p>
+      <div style="background-color: #f8fafc; border-left: 5px solid ${this.BRAND_GREEN}; padding: 24px 28px; border-radius: 4px 12px 12px 4px; margin-bottom: 36px;">
+        <p style="margin: 0; font-size: 15px; color: #334155; line-height: 1.6; font-style: italic;">"${content || "Sent an attachment..."}"</p>
       </div>
-      <a href="https://victhon.co/chat" style="display: inline-block; padding: 18px 40px; background-color: ${this.BRAND_GREEN}; color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 800;">View Message</a>
+      <a href="https://victhon.co/chat" style="display: inline-block; padding: 16px 36px; background-color: ${this.BRAND_GREEN}; color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 15px;">View Message</a>
     `;
-    return this.sendEmail(email, `New message from ${senderName}`, html, "New Notification");
+    return this.sendEmail(email, `New message from ${senderName} — Victhon`, html, "New Message");
   }
 }
