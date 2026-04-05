@@ -13,7 +13,8 @@ import OfflineNotification from "../../services/OfflineNotification";
 import Inbox from "../../services/Inbox";
 import { Not } from "typeorm";
 import ChatEntity from "../../entities/ChatEntity";
-import { NotificationType } from "../../entities/Notification";
+import { Notification, NotificationStatus, NotificationType } from "../../entities/Notification";
+import NotificationService from "../../services/Notification";
 
 
 interface SendMessagePayload {
@@ -210,13 +211,30 @@ export default class SocketHandler {
                         : await SocketHandler.userService.getSocketId(receiverId);
                     
                     if (receiverSocketId) {
+                        const notifData = {
+                            type: NotificationType.CHAT,
+                            data: { ...pushData.data, content },
+                            title: pushData.title,
+                            body: pushData.body,
+                            createdAt: new Date()
+                        };
+
+                        // 1. Persist to Database
+                        const repo = AppDataSource.getRepository(Notification);
+                        const newNotification = repo.create({
+                            ...(receiverType === UserType.USER ? { userId: receiverId } : { professionalId: receiverId }),
+                            userType: receiverType,
+                            type: NotificationType.CHAT,
+                            data: notifData.data,
+                            status: NotificationStatus.SENT
+                        });
+                        await repo.save(newNotification);
+
+                        // 2. Emit Real-time Socket Event
                         io.of(Namespaces.BASE).to(receiverSocketId).emit("notification", {
                             notification: {
-                                type: NotificationType.CHAT,
-                                data: { ...pushData.data, content },
-                                title: pushData.title,
-                                body: pushData.body,
-                                createdAt: new Date()
+                                ...notifData,
+                                id: newNotification.id
                             }
                         });
                     }
@@ -566,5 +584,38 @@ export default class SocketHandler {
         socket.join(room);
         logger.info(`👤 ${socket.id} joined room ${room}`);
         socket.emit("joined-booking", Handler.responseData(false, "Joined booking room", { bookingId }));
+    }
+    
+    
+    /**
+     * Fetch all notifications for a user/professional
+     */
+    public static async getNotifications(io: Server, socket: ISocket, data: any) {
+        try {
+            const userId = socket.locals.data.id;
+            const userType = socket.locals.data.userType;
+            const { page = 1, limit = 20 } = data || {};
+
+            const notifService = new NotificationService();
+            const result = await notifService.notifications(userId, userType, page, limit);
+
+            const notifications = (result.json.data?.records || []).map((n: any) => {
+                return {
+                    id: n.id,
+                    type: n.type,
+                    title: n.data?.title || "Victhon Update",
+                    body: n.data?.body || "You have a new update.",
+                    time: n.createdAt,
+                    unread: !n.isRead,
+                    data: n.data
+                };
+            });
+
+            socket.emit("all-notifications", notifications);
+            logger.info(" Sent " + notifications.length + " notifications to " + userType + ":" + userId);
+        } catch (error) {
+            logger.error("getNotifications error:", error);
+            socket.emit("appError", Handler.responseData(true, "Failed to load notifications"));
+        }
     }
 }

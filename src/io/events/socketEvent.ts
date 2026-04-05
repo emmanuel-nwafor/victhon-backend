@@ -12,6 +12,7 @@ socketEvent.register("typing", SocketHandler.typing.bind(SocketHandler));
 socketEvent.register("delete-messages", SocketHandler.deleteMessages.bind(SocketHandler));
 socketEvent.register("update-location", SocketHandler.updateLocation.bind(SocketHandler));
 socketEvent.register("join-booking", SocketHandler.joinBooking.bind(SocketHandler));
+socketEvent.register("get-notifications", SocketHandler.getNotifications.bind(SocketHandler));
 socketEvent.register("disconnect", SocketHandler.disconnect.bind(SocketHandler));
 
 export default socketEvent;

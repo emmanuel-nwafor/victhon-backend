@@ -51,10 +51,10 @@ export class Notification {
     id: string;
 
     @Column({ nullable: true })
-    userId?: string;
+    userId?: string | null | undefined;
 
     @Column({ nullable: true })
-    professionalId?: string;
+    professionalId?: string | null | undefined;
 
     @ManyToOne(() => User, { onDelete: "CASCADE" })
     user: User;
