@@ -49,6 +49,18 @@ export default class Authentication extends Service {
     return true;
   }
 
+  private async issuePinResetOTP(email: string, userType: UserType) {
+    const otp = this.generateOTP();
+    // Reuse the password-reset OTP cache slot (same TTL, same verification flow)
+    const cached = await this.otpCache.setPasswordResetOTP(email, userType, otp);
+    if (!cached) {
+      return false;
+    }
+
+    await this.emailService.sendPinResetOTP(email, otp);
+    return true;
+  }
+
   private async sendWelcomeEmail(email: string, name: string) {
     try {
       await this.emailService.sendWelcomeEmail(email, name);
@@ -735,6 +747,40 @@ export default class Authentication extends Service {
         HttpStatus.OK,
         false,
         "If an account with that email exists, an OTP has been sent.",
+      );
+    } catch (error) {
+      return super.handleTypeormError(error);
+    }
+  }
+
+  public async forgotPin(email: string) {
+    try {
+      email = normalizeEmail(email);
+      const professionalRepo = AppDataSource.getRepository(Professional);
+      const professional = await professionalRepo.findOneBy({ email });
+
+      if (!professional) {
+        // Silent success to prevent email enumeration
+        return this.responseData(
+          HttpStatus.OK,
+          false,
+          "If a professional account with that email exists, a PIN reset code has been sent.",
+        );
+      }
+
+      const otpIssued = await this.issuePinResetOTP(email, UserType.PROFESSIONAL);
+      if (!otpIssued) {
+        return this.responseData(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          true,
+          "Unable to send PIN reset code at the moment. Please try again.",
+        );
+      }
+
+      return this.responseData(
+        HttpStatus.OK,
+        false,
+        "If a professional account with that email exists, a PIN reset code has been sent.",
       );
     } catch (error) {
       return super.handleTypeormError(error);

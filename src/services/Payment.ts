@@ -869,6 +869,35 @@ export default class Payment extends BaseService {
     }
   }
 
+  public async changePinAfterVerification(userId: string, email: string, pin: string) {
+    try {
+      if (!pin || pin.length < 4) return this.responseData(400, true, "PIN must be at least 4 characters");
+
+      // Must have completed OTP verification first
+      const OTPCache = require("../cache/otpCache").default;
+      const { UserType } = require("../types/constants");
+      const otpCache = new OTPCache();
+      const verifiedResult = await otpCache.getPasswordResetVerified(email, UserType.PROFESSIONAL);
+      if (verifiedResult.error || !verifiedResult.data?.verified) {
+        return this.responseData(400, true, "PIN change not authorized. Please verify your OTP first.");
+      }
+
+      // Clear the verified flag so it can't be replayed
+      await otpCache.deletePasswordResetVerified(email, UserType.PROFESSIONAL);
+
+      const pro = await this.proRepo.findOneBy({ id: userId });
+      if (!pro) return this.responseData(404, true, "Professional account not found");
+
+      const Password = require("../utils/Password").default;
+      const hashedPin = Password.hashPassword(pin, env(EnvKey.STORED_SALT)!);
+      await this.proRepo.update({ id: userId }, { pin: hashedPin });
+
+      return this.responseData(200, false, "Transaction PIN changed successfully");
+    } catch (error) {
+      return this.handleTypeormError(error);
+    }
+  }
+
   public async getBanks() {
     try {
       const response = await this.flwClient.get("/banks/NG");

@@ -40,6 +40,7 @@ paymentRouter.get('/banks', asyncHandler(Controller.getBanks));
 paymentRouter.get('/has-pin', verifyJWT([UserType.PROFESSIONAL]), asyncHandler(Controller.getHasPin));
 paymentRouter.post('/resolve-account', resolveAccountValidator, asyncHandler(Controller.resolveAccount));
 paymentRouter.post('/setup-pin', setupPinValidator, asyncHandler(Controller.setupPin));
+paymentRouter.post('/change-pin', setupPinValidator, verifyJWT([UserType.PROFESSIONAL]), asyncHandler(Controller.changePin));
 
 
 // paymentRouter.get('/booking/verify/:bookingId', initializeValidator, asyncHandler(verifyBookingTransaction));

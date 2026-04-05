@@ -114,4 +114,10 @@ export default class Authentication {
         const serviceResult = await Authentication.service.googleAuth(idToken, UserType.PROFESSIONAL);
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
+
+    public static async forgotProfessionalPin(req: Request, res: Response) {
+        const { email } = req.body;
+        const serviceResult = await Authentication.service.forgotPin(email);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
 }

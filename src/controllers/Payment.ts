@@ -51,6 +51,13 @@ export default class Payment {
         Controller.response(res, serviceResult);
     }
 
+    public static async changePin(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { pin, email } = req.body;
+        const serviceResult = await Payment.service.changePinAfterVerification(userId, email, pin);
+        Controller.response(res, serviceResult);
+    }
+
     public static async withdraw(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
         const { accountId, amount, pin, bankCode, accountNumber, accountName } = req.body;
