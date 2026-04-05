@@ -6,24 +6,11 @@ import fs from 'fs';
 import path from 'path';
 
 const allowedMimeTypes: string[] = ['image/jpeg', 'image/jpg', 'image/png'];
-const fileSize: number = 10.0 * 1024 * 1024; // Increased to 10MB to accommodate high-res mobile photos
+const fileSize: number = 10.0 * 1024 * 1024;
 
 const typeError = "LIMIT_INVALID_FILE_TYPE";
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../../uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        const name = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-        cb(null, name);
-    },
-});
+const storage = multer.memoryStorage();
 
 const imageFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png'];
@@ -78,7 +65,7 @@ export const mediaUpload = (maxFiles: number = 6) => {
         storage: storage,
         limits: { fileSize: 100 * 1024 * 1024, files: maxFiles },
         fileFilter: (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-            const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'video/webm','video/mpeg',"application/pdf"];
+            const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'video/webm', 'video/mpeg', "application/pdf"];
             if (!allowedMimeTypes.includes(file.mimetype)) {
                 return cb(new Error(typeError));
             }

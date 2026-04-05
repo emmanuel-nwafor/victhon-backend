@@ -40,10 +40,10 @@ export default class Cloudinary extends Service {
         const publicIds: string[] = [];
 
         const MAX_RETRIES = 3;
-        const RETRY_DELAY = (attempt: number) => new Promise(res => setTimeout(res, 500 * Math.pow(2, attempt))); // Exponential backoff
+        const RETRY_DELAY = (attempt: number) => new Promise(res => setTimeout(res, 500 * Math.pow(2, attempt)));
 
         await Promise.all(
-            files.map(async (file) => {
+            files.map(async (file: any) => {
                 let attempt = 0;
                 let success = false;
 
@@ -57,7 +57,26 @@ export default class Cloudinary extends Service {
                             timeout: 100000,
                         };
 
-                        const result: any = await cloudinary.uploader.upload(file.path, baseDetails);
+                        // 📍 Handle both MemoryStorage (buffer) and DiskStorage (path)
+                        const result: any = await new Promise((resolve, reject) => {
+                            if (file.buffer) {
+                                const stream = cloudinary.uploader.upload_stream(
+                                    baseDetails,
+                                    (error, result) => {
+                                        if (error) reject(error);
+                                        else resolve(result);
+                                    }
+                                );
+                                stream.end(file.buffer);
+                            } else if (file.path) {
+                                cloudinary.uploader.upload(file.path, baseDetails)
+                                    .then(resolve)
+                                    .catch(reject);
+                            } else {
+                                reject(new Error("File object has neither buffer nor path."));
+                            }
+                        });
+
 
                         let thumbnail: null | string = null;
                         const url = resolvedType === ResourceType.IMAGE
@@ -72,10 +91,10 @@ export default class Cloudinary extends Service {
                             let thumbnailUrl = cloudinary.url(result.public_id, {
                                 resource_type: 'video',
                                 transformation: [
-                                    {start_offset: "auto"}, // Supports 'auto' or number
-                                    {width: 640, height: 360, crop: 'fill'},
-                                    {quality: 'auto'},
-                                    {format: 'jpg'}, // Crucial: Forces image output
+                                    { start_offset: "auto" },
+                                    { width: 640, height: 360, crop: 'fill' },
+                                    { quality: 'auto' },
+                                    { format: 'jpg' },
                                 ],
                             });
 
@@ -97,17 +116,23 @@ export default class Cloudinary extends Service {
                         attempt++;
                         if (attempt >= MAX_RETRIES) {
                             console.error(`Upload failed for ${file.originalname}:`, error);
-                            failedFiles.push({filename: file.originalname, error: error.message});
+                            failedFiles.push({ filename: file.originalname, error: error.message });
                         } else {
                             console.warn(`Retrying upload for ${file.originalname} (Attempt ${attempt})...`);
-                            await RETRY_DELAY(attempt); // Wait before retrying
+                            await RETRY_DELAY(attempt);
                         }
                     }
                 }
             })
         );
-        await deleteFiles(files);
-        return {uploadedFiles, failedFiles, publicIds};
+
+        // 📍 Only attempt to delete files that were on disk
+        const diskFiles = (files as any[]).filter(f => f.path);
+        if (diskFiles.length > 0) {
+            await deleteFiles(diskFiles);
+        }
+        
+        return { uploadedFiles, failedFiles, publicIds };
     }
 
     public async upload(
