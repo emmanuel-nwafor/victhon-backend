@@ -5,6 +5,7 @@ import env, { EnvKey } from "../config/env";
 import { AppDataSource } from "../data-source";
 import { Professional } from "../entities/Professional";
 import { User } from "../entities/User";
+import { Admin } from "../entities/Admin";
 import { HttpStatus, UserType } from "../types/constants";
 import deleteFiles from "../utils/deleteFiles";
 import { AuthProvider } from "../types/constants";
@@ -588,6 +589,69 @@ export default class Authentication extends Service {
         );
       }
       return this.responseData(404, true, "User was not found");
+    } catch (error) {
+      return super.handleTypeormError(error);
+    }
+  }
+
+  public async adminLogin(email: string, password: string) {
+    try {
+      email = normalizeEmail(email);
+      const adminRepo = AppDataSource.getRepository(Admin);
+
+      let result = await adminRepo
+        .createQueryBuilder("admin")
+        .addSelect("admin.password")
+        .where("admin.email = :email", { email })
+        .getOne();
+
+      if (result) {
+        const admin = result;
+        const hashedPassword = admin.password;
+        const validPassword = Password.compare(
+          password,
+          hashedPassword,
+          this.storedSalt,
+        );
+
+        if (validPassword) {
+          if (!admin.isActive) {
+            return super.responseData(
+              HttpStatus.FORBIDDEN,
+              true,
+              "This admin account has been deactivated",
+            );
+          }
+
+          const token = this.generateUserToken(
+            {
+              id: admin.id,
+              userType: UserType.Admin,
+            },
+            UserType.Admin,
+          );
+
+          const data = {
+            user: {
+              ...admin,
+              password: undefined,
+            },
+            token: token,
+          };
+          return this.responseData(
+            200,
+            false,
+            "Admin has been logged in successfully",
+            data,
+          );
+        }
+        return super.responseData(
+          HttpStatus.BAD_REQUEST,
+          true,
+          "Invalid password",
+        );
+      }
+      return this.responseData(404, true, "Admin was not found");
     } catch (error) {
       return super.handleTypeormError(error);
     }

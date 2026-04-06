@@ -21,8 +21,7 @@ import schedule from "../routes/schedule";
 import service from "../routes/service";
 import user from "../routes/user";
 import wallet from "../routes/wallet";
-
-
+import admin from "../routes/admin";
 import { RedisStore } from "connect-redis";
 import session from "express-session";
 import socketEvent from "../io/events/socketEvent";
@@ -85,6 +84,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use("/api/v1/chats", chat);
     app.use("/api/v1/settings", verifyJWT([UserType.USER, UserType.PROFESSIONAL]), setting);
     app.use("/api/v1/professionals/wallets", verifyJWT([UserType.PROFESSIONAL]), wallet);
+    app.use("/api/v1/admin", admin);
 
 
     app.post("/api/v1/test", async (req: Request, res: Response) => {
