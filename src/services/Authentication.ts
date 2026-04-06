@@ -389,6 +389,14 @@ export default class Authentication extends Service {
             );
           }
 
+          if (!user.isActive) {
+            return super.responseData(
+              HttpStatus.FORBIDDEN,
+              true,
+              "Your account has been suspended. Please contact support.",
+            );
+          }
+
           const token = this.generateUserToken(
             { id: user.id, userType: UserType.USER },
             UserType.USER,
@@ -550,6 +558,14 @@ export default class Authentication extends Service {
               HttpStatus.FORBIDDEN,
               true,
               "Please verify your email before logging in",
+            );
+          }
+
+          if (!user.isActive) {
+            return super.responseData(
+              HttpStatus.FORBIDDEN,
+              true,
+              "Your account has been suspended. Please contact support.",
             );
           }
 

@@ -25,8 +25,8 @@ export class Admin {
     lastName: string;
 
     @Column({
-        type: "jsonb",
-        default: [],
+        type: "json",
+        nullable: true,
     })
     permissions: AdminPermission[];
 

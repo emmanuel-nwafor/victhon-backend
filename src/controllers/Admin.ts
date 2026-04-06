@@ -20,10 +20,31 @@ export default class AdminController extends Controller {
         return res.status(result.statusCode).json(result);
     };
 
+    public toggleUserStatus = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const { isActive } = req.body;
+        const result = await this.adminService.toggleUserStatus(id, isActive);
+        return res.status(result.statusCode).json(result);
+    };
+
     public getProfessionals = async (req: Request, res: Response) => {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 20;
         const result = await this.adminService.getProfessionals(page, limit);
+        return res.status(result.statusCode).json(result);
+    };
+
+    public toggleProfessionalStatus = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const { isActive } = req.body;
+        const result = await this.adminService.toggleProfessionalStatus(id, isActive);
+        return res.status(result.statusCode).json(result);
+    };
+
+    public getPendingProfessionals = async (req: Request, res: Response) => {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const result = await this.adminService.getPendingProfessionals(page, limit);
         return res.status(result.statusCode).json(result);
     };
 
@@ -43,6 +64,24 @@ export default class AdminController extends Controller {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 20;
         const result = await this.adminService.getTransactions(page, limit);
+        return res.status(result.statusCode).json(result);
+    };
+
+    public getBookings = async (req: Request, res: Response) => {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const result = await this.adminService.getBookings(page, limit);
+        return res.status(result.statusCode).json(result);
+    };
+
+    public getBookingDetails = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const result = await this.adminService.getBookingDetails(id);
+        return res.status(result.statusCode).json(result);
+    };
+
+    public createAdmin = async (req: Request, res: Response) => {
+        const result = await this.adminService.createAdmin(req.body);
         return res.status(result.statusCode).json(result);
     };
 }
