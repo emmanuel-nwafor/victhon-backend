@@ -103,6 +103,24 @@ export default class Authentication {
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 
+    public static async forgotAdminPassword(req: Request, res: Response) {
+        const { email } = req.body;
+        const serviceResult = await Authentication.service.forgotPassword(email, UserType.Admin);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
+    public static async verifyAdminPasswordResetOTP(req: Request, res: Response) {
+        const { email, otp } = req.body;
+        const serviceResult = await Authentication.service.verifyPasswordResetOTP(email, otp, UserType.Admin);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
+    public static async resetAdminPassword(req: Request, res: Response) {
+        const { email, newPassword } = req.body;
+        const serviceResult = await Authentication.service.resetPassword(email, newPassword, UserType.Admin);
+        res.status(serviceResult.statusCode).json(serviceResult.json);
+    }
+
     public static async userGoogleAuth(req: Request, res: Response) {
         const { idToken } = req.body;
         const serviceResult = await Authentication.service.googleAuth(idToken, UserType.USER);

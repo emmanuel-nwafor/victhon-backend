@@ -27,6 +27,10 @@ auth.post("/professionals/verify-password-reset-otp", verifyPasswordResetOTP, as
 auth.post("/professionals/reset-password", resetPassword, asyncHandler(Authentication.resetProfessionalPassword));
 auth.post("/professionals/forgot-pin", forgotPassword, asyncHandler(Authentication.forgotProfessionalPin));
 
+auth.post("/admin/forgot-password", forgotPassword, asyncHandler(Authentication.forgotAdminPassword));
+auth.post("/admin/verify-password-reset-otp", verifyPasswordResetOTP, asyncHandler(Authentication.verifyAdminPasswordResetOTP));
+auth.post("/admin/reset-password", resetPassword, asyncHandler(Authentication.resetAdminPassword));
+
 auth.post("/users/google", asyncHandler(Authentication.userGoogleAuth));
 auth.post("/professionals/google", asyncHandler(Authentication.professionalGoogleAuth));
 

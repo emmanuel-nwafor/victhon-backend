@@ -834,9 +834,16 @@ export default class Authentication extends Service {
   public async forgotPassword(email: string, userType: UserType) {
     try {
       email = normalizeEmail(email);
-      const repo = userType === UserType.USER
-        ? AppDataSource.getRepository(User)
-        : AppDataSource.getRepository(Professional);
+      let repo: any;
+      if (userType === UserType.USER) {
+        repo = AppDataSource.getRepository(User);
+      } else if (userType === UserType.PROFESSIONAL) {
+        repo = AppDataSource.getRepository(Professional);
+      } else if (userType === UserType.Admin) {
+        repo = AppDataSource.getRepository(Admin);
+      } else {
+        return this.responseData(HttpStatus.BAD_REQUEST, true, "Invalid user type");
+      }
 
       const user = await repo.findOneBy({ email });
       if (!user) {
@@ -953,7 +960,7 @@ export default class Authentication extends Service {
         }
         user.password = hashedPassword;
         await userRepo.save(user);
-      } else {
+      } else if (userType === UserType.PROFESSIONAL) {
         const professionalRepo = AppDataSource.getRepository(Professional);
         const user = await professionalRepo.findOneBy({ email });
         if (!user) {
@@ -961,6 +968,16 @@ export default class Authentication extends Service {
         }
         user.password = hashedPassword;
         await professionalRepo.save(user);
+      } else if (userType === UserType.Admin) {
+        const adminRepo = AppDataSource.getRepository(Admin);
+        const user = await adminRepo.findOneBy({ email });
+        if (!user) {
+          return this.responseData(HttpStatus.NOT_FOUND, true, "Admin was not found");
+        }
+        user.password = hashedPassword;
+        await adminRepo.save(user);
+      } else {
+        return this.responseData(HttpStatus.BAD_REQUEST, true, "Invalid user type");
       }
 
       return this.responseData(

@@ -14,6 +14,8 @@ import BookingService from "./services/Booking";
 import { OfflineNotification } from "./jobs/OfflineNotification";
 import { Inbox } from "./jobs/Inbox";
 import logger from "./config/logger";
+import { Admin } from "./entities/Admin";
+import Password from "./utils/Password";
 
 const PORT = env(EnvKey.PORT)!;
 
@@ -49,7 +51,40 @@ const PORT = env(EnvKey.PORT)!;
         await RabbitMQ.connect();
 
         await AppDataSource.initialize()
-            .then(() => logger.info("Database connected successfully"))
+            .then(async () => {
+                logger.info("Database connected successfully");
+                
+                // Initialize default admin if none exist
+                try {
+                    const adminRepo = AppDataSource.getRepository(Admin);
+                    const adminCount = await adminRepo.count();
+                    
+                    if (adminCount === 0) {
+                        const email = env(EnvKey.DEFAULT_ADMIN_EMAIL);
+                        const rawPassword = env(EnvKey.DEFAULT_ADMIN_PASSWORD);
+                        const storedSalt = env(EnvKey.STORED_SALT);
+                        
+                        if (email && rawPassword && storedSalt) {
+                            const password = Password.hashPassword(rawPassword, storedSalt);
+                            const defaultAdmin = adminRepo.create({
+                                email,
+                                password,
+                                firstName: "System",
+                                lastName: "Admin",
+                                role: "superadmin",
+                                permissions: [],
+                                isActive: true
+                            });
+                            await adminRepo.save(defaultAdmin);
+                            logger.info("Default admin account initialized successfully.");
+                        } else {
+                            logger.warn("Missing DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, or STORED_SALT in env. Skip admin creation.");
+                        }
+                    }
+                } catch (adminErr) {
+                    logger.error("Failed to initialize default admin", adminErr);
+                }
+            })
             .catch(err => logger.error("Database connection failed", err));
 
         const { server: app, io } = await createApp(pubClient, subClient);
