@@ -57,15 +57,16 @@ const PORT = env(EnvKey.PORT)!;
                 // Initialize default admin if none exist
                 try {
                     const adminRepo = AppDataSource.getRepository(Admin);
-                    const adminCount = await adminRepo.count();
                     
-                    if (adminCount === 0) {
-                        const email = env(EnvKey.DEFAULT_ADMIN_EMAIL);
-                        const rawPassword = env(EnvKey.DEFAULT_ADMIN_PASSWORD);
-                        const storedSalt = env(EnvKey.STORED_SALT);
-                        
-                        if (email && rawPassword && storedSalt) {
-                            const password = Password.hashPassword(rawPassword, storedSalt);
+                    const email = env(EnvKey.DEFAULT_ADMIN_EMAIL);
+                    const rawPassword = env(EnvKey.DEFAULT_ADMIN_PASSWORD);
+                    const storedSalt = env(EnvKey.STORED_SALT);
+                    
+                    if (email && rawPassword && storedSalt) {
+                        const password = Password.hashPassword(rawPassword, storedSalt);
+                        const existingAdmin = await adminRepo.findOneBy({ email });
+
+                        if (!existingAdmin) {
                             const defaultAdmin = adminRepo.create({
                                 email,
                                 password,
@@ -77,9 +78,13 @@ const PORT = env(EnvKey.PORT)!;
                             });
                             await adminRepo.save(defaultAdmin);
                             logger.info("Default admin account initialized successfully.");
-                        } else {
-                            logger.warn("Missing DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, or STORED_SALT in env. Skip admin creation.");
+                        } else if (existingAdmin.password !== password) {
+                            existingAdmin.password = password;
+                            await adminRepo.save(existingAdmin);
+                            logger.info("Default admin password synchronized with environment variables.");
                         }
+                    } else {
+                        logger.warn("Missing DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, or STORED_SALT in env. Skip admin creation/sync.");
                     }
                 } catch (adminErr) {
                     logger.error("Failed to initialize default admin", adminErr);
