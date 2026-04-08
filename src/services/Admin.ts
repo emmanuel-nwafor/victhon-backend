@@ -246,6 +246,60 @@ export default class AdminService extends Service {
         }
     }
 
+    public async getTransactionDetails(id: string) {
+        try {
+            const transRepo = AppDataSource.getRepository(Transaction);
+            const transaction = await transRepo.findOne({
+                where: { id },
+                relations: ["user", "professional", "booking"],
+            });
+
+            if (!transaction) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "Transaction not found");
+            }
+
+            return this.responseData(HttpStatus.OK, false, "Transaction details fetched successfully", transaction);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async getUserDetails(id: string) {
+        try {
+            const userRepo = AppDataSource.getRepository(User);
+            const user = await userRepo.findOne({
+                where: { id },
+                // Add relations if needed
+            });
+
+            if (!user) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "User not found");
+            }
+
+            return this.responseData(HttpStatus.OK, false, "User details fetched successfully", user);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async getProfessionalDetails(id: string) {
+        try {
+            const proRepo = AppDataSource.getRepository(Professional);
+            const professional = await proRepo.findOne({
+                where: { id },
+                // Add relations if needed
+            });
+
+            if (!professional) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "Professional not found");
+            }
+
+            return this.responseData(HttpStatus.OK, false, "Professional details fetched successfully", professional);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
     public async createAdmin(adminData: any) {
         try {
             const adminRepo = AppDataSource.getRepository(Admin);

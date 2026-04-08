@@ -14,10 +14,12 @@ adminRouter.use(verifyJWT([UserType.Admin]));
 
 adminRouter.post("/", controller.createAdmin);
 adminRouter.get("/users", controller.getUsers);
+adminRouter.get("/users/:id", controller.getUserDetails);
 adminRouter.patch("/users/:id/status", controller.toggleUserStatus);
 
 adminRouter.get("/professionals", controller.getProfessionals);
 adminRouter.get("/professionals/pending", controller.getPendingProfessionals);
+adminRouter.get("/professionals/:id", controller.getProfessionalDetails);
 adminRouter.patch("/professionals/:id/status", controller.toggleProfessionalStatus);
 adminRouter.patch("/professionals/:id/verify", controller.verifyProfessional);
 
@@ -26,5 +28,6 @@ adminRouter.get("/bookings/:id", controller.getBookingDetails);
 
 adminRouter.get("/stats", controller.getStats);
 adminRouter.get("/transactions", controller.getTransactions);
+adminRouter.get("/transactions/:id", controller.getTransactionDetails);
 
 export default adminRouter;
