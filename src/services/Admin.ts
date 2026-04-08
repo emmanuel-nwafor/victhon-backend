@@ -166,6 +166,12 @@ export default class AdminService extends Service {
                 .where("transaction.status = :status", { status: "success" })
                 .getRawOne();
 
+            const recentTransactions = await transRepo.find({
+                relations: ["user"],
+                order: { createdAt: "DESC" },
+                take: 5
+            });
+
             return this.responseData(HttpStatus.OK, false, "Stats fetched successfully", {
                 totalUsers,
                 totalProfessionals,
@@ -174,6 +180,7 @@ export default class AdminService extends Service {
                 pendingVerifications,
                 totalEscrowBalance: parseFloat(activeEscrowResult?.total || "0"),
                 totalRevenue: parseFloat(revenueResult?.total || "0"),
+                recentTransactions
             });
         } catch (error) {
             return this.handleTypeormError(error);
