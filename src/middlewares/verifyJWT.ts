@@ -3,6 +3,11 @@ import Token from '../services/Token';
 import {HttpStatus, HttpStatusMessage} from "../types/constants";
 import env, {EnvKey} from "../config/env";
 import TokenBlackList from '../cache/TokenBlacklist';
+import { AppDataSource } from '../data-source';
+import { User } from '../entities/User';
+import { Professional } from '../entities/Professional';
+import { Admin } from '../entities/Admin';
+import { UserType } from '../types/constants';
 
 const verifyJWT = (types: string[], neededData: string[] = ['data']) => async (req: Request, res: Response, next: NextFunction) => {
     const tokenSecret: string = env(EnvKey.TOKEN_SECRET)!;
@@ -55,6 +60,37 @@ const verifyJWT = (types: string[], neededData: string[] = ['data']) => async (r
     }
 
     res.locals['userType'] = tokenValidationResult.data['types'][0];
+
+    const userData = tokenValidationResult.data.data;
+    const userRole = tokenValidationResult.data.types[0];
+
+    // Check suspension status directly
+    if (userData && userData.id && userRole) {
+        let accountActive = true;
+        
+        if (userRole === UserType.USER) {
+            const userRepo = AppDataSource.getRepository(User);
+            const user = await userRepo.findOne({ select: ["id", "isActive"], where: { id: userData.id } });
+            if (user && !user.isActive) accountActive = false;
+        } else if (userRole === UserType.PROFESSIONAL) {
+            const proRepo = AppDataSource.getRepository(Professional);
+            const pro = await proRepo.findOne({ select: ["id", "isActive"], where: { id: userData.id } });
+            if (pro && !pro.isActive) accountActive = false;
+        } else if (userRole === UserType.Admin) {
+            const adminRepo = AppDataSource.getRepository(Admin);
+            const admin = await adminRepo.findOne({ select: ["id", "isActive"], where: { id: userData.id } });
+            if (admin && !admin.isActive) accountActive = false;
+        }
+
+        if (!accountActive) {
+            res.status(403).json({
+                error: true,
+                message: "Account Suspended: You no longer have access to the system."
+            });
+            return;
+        }
+    }
+
     next();
 }
 

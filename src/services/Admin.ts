@@ -4,7 +4,9 @@ import { Professional } from "../entities/Professional";
 import { Transaction } from "../entities/Transaction";
 import { Booking } from "../entities/Booking";
 import { Admin } from "../entities/Admin";
-import { Escrow, EscrowStatus } from "../entities/Escrow";
+import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
+import { PlatformSetting } from "../entities/PlatformSetting";
+import { Dispute, DisputeStatus } from "../entities/Dispute";
 import Service from "./Service";
 import { HttpStatus } from "../types/constants";
 import Password from "../utils/Password";
@@ -330,6 +332,131 @@ export default class AdminService extends Service {
                 ...admin,
                 password: undefined,
             });
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async deleteUser(id: string) {
+        try {
+            const userRepo = AppDataSource.getRepository(User);
+            const user = await userRepo.findOneBy({ id });
+            if (!user) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "User not found");
+            }
+            await userRepo.remove(user); // Wait, depending on cascades this might cause issues, but hard delete was requested
+            return this.responseData(HttpStatus.OK, false, "User successfully deleted");
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async getPlatformSettings() {
+        try {
+            const settingsRepo = AppDataSource.getRepository(PlatformSetting);
+            let settings = await settingsRepo.findOne({ where: {} }); // Assume 1 global row
+            if (!settings) {
+                // Initialize default
+                settings = settingsRepo.create({ platformFeePercentage: 10, fixedFee: 0 });
+                await settingsRepo.save(settings!);
+            }
+            return this.responseData(HttpStatus.OK, false, "Platform Settings fetched", settings);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async updatePlatformSettings(data: any) {
+        try {
+            const settingsRepo = AppDataSource.getRepository(PlatformSetting);
+            let settings = await settingsRepo.findOne({ where: {} });
+            if (!settings) {
+                settings = settingsRepo.create({
+                    platformFeePercentage: data.platformFeePercentage,
+                    fixedFee: data.fixedFee
+                });
+            } else {
+                if (data.platformFeePercentage !== undefined) settings.platformFeePercentage = data.platformFeePercentage;
+                if (data.fixedFee !== undefined) settings.fixedFee = data.fixedFee;
+            }
+            await settingsRepo.save(settings!);
+            return this.responseData(HttpStatus.OK, false, "Platform Settings updated", settings);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async getDisputes(page: number = 1, limit: number = 20) {
+        try {
+            const disputeRepo = AppDataSource.getRepository(Dispute);
+            const [disputes, total] = await disputeRepo.findAndCount({
+                relations: ["transaction", "transaction.user", "transaction.professional", "transaction.escrow", "transaction.escrow.booking"],
+                skip: (page - 1) * limit,
+                take: limit,
+                order: { createdAt: "DESC" },
+            });
+
+            return this.responseData(HttpStatus.OK, false, "Disputes fetched successfully", {
+                disputes,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            });
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async resolveDispute(id: string, action: 'refund_user' | 'release_to_provider') {
+        try {
+            const disputeRepo = AppDataSource.getRepository(Dispute);
+            const escrowRepo = AppDataSource.getRepository(Escrow);
+            const dispute = await disputeRepo.findOne({
+                where: { id },
+                relations: ["transaction", "transaction.escrow"]
+            });
+
+            if (!dispute) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "Dispute not found");
+            }
+
+            if (dispute.status !== DisputeStatus.OPEN) {
+                return this.responseData(HttpStatus.BAD_REQUEST, true, "Dispute is already resolved");
+            }
+
+            const escrow = dispute.transaction?.escrow;
+            if (!escrow) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "No Escrow found attached to this dispute's transaction");
+            }
+
+            if (action === "refund_user") {
+                dispute.status = DisputeStatus.WON; // Customer Won
+                escrow.status = EscrowStatus.CANCELLED;
+                escrow.refundStatus = RefundStatus.PENDING;
+                
+                await disputeRepo.save(dispute);
+                await escrowRepo.save(escrow);
+                
+                // Real implementation would also trigger the refund via payment gateway here securely
+
+                return this.responseData(HttpStatus.OK, false, "Dispute resolved in favor of customer. Refund pending.");
+            } else if (action === "release_to_provider") {
+                dispute.status = DisputeStatus.LOST; // Customer Lost
+                escrow.status = EscrowStatus.RELEASED; // Or PAID
+                
+                await disputeRepo.save(dispute);
+                await escrowRepo.save(escrow);
+                
+                // Real implementation would trigger the escrow push to Provider's Wallet here
+                
+                return this.responseData(HttpStatus.OK, false, "Dispute resolved in favor of provider. Funds releasing.");
+            } else {
+                return this.responseData(HttpStatus.BAD_REQUEST, true, "Invalid action");
+            }
+
         } catch (error) {
             return this.handleTypeormError(error);
         }

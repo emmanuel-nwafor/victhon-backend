@@ -30,4 +30,12 @@ adminRouter.get("/stats", controller.getStats);
 adminRouter.get("/transactions", controller.getTransactions);
 adminRouter.get("/transactions/:id", controller.getTransactionDetails);
 
+adminRouter.delete("/users/:id", controller.deleteUser);
+
+adminRouter.get("/settings", controller.getPlatformSettings);
+adminRouter.patch("/settings", controller.updatePlatformSettings);
+
+adminRouter.get("/disputes", controller.getDisputes);
+adminRouter.patch("/disputes/:id/resolve", controller.resolveDispute);
+
 export default adminRouter;

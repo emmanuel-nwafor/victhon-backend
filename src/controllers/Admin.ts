@@ -102,4 +102,34 @@ export default class AdminController extends Controller {
         const result = await this.adminService.createAdmin(req.body);
         Controller.response(res, result);
     };
+
+    public deleteUser = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const result = await this.adminService.deleteUser(id);
+        Controller.response(res, result);
+    };
+
+    public getPlatformSettings = async (req: Request, res: Response) => {
+        const result = await this.adminService.getPlatformSettings();
+        Controller.response(res, result);
+    };
+
+    public updatePlatformSettings = async (req: Request, res: Response) => {
+        const result = await this.adminService.updatePlatformSettings(req.body);
+        Controller.response(res, result);
+    };
+
+    public getDisputes = async (req: Request, res: Response) => {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const result = await this.adminService.getDisputes(page, limit);
+        Controller.response(res, result);
+    };
+
+    public resolveDispute = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const { action } = req.body;
+        const result = await this.adminService.resolveDispute(id, action);
+        Controller.response(res, result);
+    };
 }
