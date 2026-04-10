@@ -26,6 +26,15 @@ export class Dispute {
     @Column({ type: "text" })
     reason: string;
 
+    @Column({ type: "text", nullable: true })
+    description: string;
+
+    @Column({ nullable: true })
+    raisedBy: string;
+
+    @Column("simple-array", { nullable: true })
+    evidenceUrls: string[];
+
     @ManyToOne(() => Transaction, (transaction) => transaction.disputes, { nullable: false })
     @JoinColumn()
     transaction: Transaction;
@@ -42,3 +51,4 @@ export class Dispute {
     @UpdateDateColumn()
     updatedAt: Date;
 }
+

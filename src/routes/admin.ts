@@ -36,6 +36,7 @@ adminRouter.get("/settings", controller.getPlatformSettings);
 adminRouter.patch("/settings", controller.updatePlatformSettings);
 
 adminRouter.get("/disputes", controller.getDisputes);
+adminRouter.get("/disputes/:id", controller.getDisputeDetails);
 adminRouter.patch("/disputes/:id/resolve", controller.resolveDispute);
 
 export default adminRouter;

@@ -132,4 +132,10 @@ export default class AdminController extends Controller {
         const result = await this.adminService.resolveDispute(id, action);
         Controller.response(res, result);
     };
+
+    public getDisputeDetails = async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const result = await this.adminService.getDisputeDetails(id);
+        Controller.response(res, result);
+    };
 }

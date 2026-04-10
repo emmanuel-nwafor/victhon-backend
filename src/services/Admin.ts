@@ -461,4 +461,22 @@ export default class AdminService extends Service {
             return this.handleTypeormError(error);
         }
     }
+
+    public async getDisputeDetails(id: string) {
+        try {
+            const disputeRepo = AppDataSource.getRepository(Dispute);
+            const dispute = await disputeRepo.findOne({
+                where: { id },
+                relations: ["transaction", "transaction.user", "transaction.professional", "transaction.escrow", "transaction.escrow.booking"],
+            });
+
+            if (!dispute) {
+                return this.responseData(HttpStatus.NOT_FOUND, true, "Dispute not found");
+            }
+
+            return this.responseData(HttpStatus.OK, false, "Dispute details fetched successfully", dispute);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
 }
