@@ -138,4 +138,9 @@ export default class AdminController extends Controller {
         const result = await this.adminService.getDisputeDetails(id);
         Controller.response(res, result);
     };
+
+    public broadcast = async (req: Request, res: Response) => {
+        const result = await this.adminService.broadcast(req.body);
+        Controller.response(res, result);
+    };
 }

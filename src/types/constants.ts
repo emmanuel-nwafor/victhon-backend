@@ -248,6 +248,8 @@ export enum QueueEvents {
     ADMIN_NOTIFICATION_OFFLINE = "notification.offline_admin",
     MASS_EMAIL = "notification.mass_email",
     SIGN_UP_EMAIL = "notification.sign_up_email",
+    NOTIFICATION_BROADCAST_PUSH = "notification.broadcast_push",
+    NOTIFICATION_BROADCAST_EMAIL = "notification.broadcast_email",
     PAYMENT_CHARGE_SUCCESSFUL = "payment.charge_successful",
     PAYMENT_BOOK_SUCCESSFUL = "payment.book_successful",
     PAYMENT_REFUND_SUCCESSFUL = "payment.refund_successful",

@@ -148,5 +148,75 @@ notification.route(QueueEvents.NOTIFICATION_OFFLINE, async (message: any, io: Se
     }
 });
 
+notification.route(QueueEvents.NOTIFICATION_BROADCAST_PUSH, async (message: any, io: Server) => {
+    const { payload: { targets, title, content } } = message;
+    try {
+        let recipientTokens: string[] = [];
+        
+        if (targets === "All Users" || targets === "Customers") {
+            const users = await AppDataSource.getRepository(UserEntity)
+                .createQueryBuilder("user")
+                .where("user.pushToken IS NOT NULL")
+                .select("user.pushToken")
+                .getMany();
+            recipientTokens.push(...users.map(u => u.pushToken));
+        }
+        
+        if (targets === "All Users" || targets === "Professionals") {
+            const pros = await AppDataSource.getRepository(ProfessionalEntity)
+                .createQueryBuilder("pro")
+                .where("pro.pushToken IS NOT NULL")
+                .select("pro.pushToken")
+                .getMany();
+            recipientTokens.push(...pros.map(p => p.pushToken));
+        }
+
+        if (recipientTokens.length > 0) {
+            await pushService.sendNotification(recipientTokens, title, content);
+            console.log(`[BROADCAST_WORKER] ✅ Pushed notification to ${recipientTokens.length} devices.`);
+        }
+    } catch (error) {
+        logger.error(`Error broadcasting push:`, error);
+    }
+});
+
+import EmailService from "../services/Email";
+const emailService = new EmailService();
+
+notification.route(QueueEvents.NOTIFICATION_BROADCAST_EMAIL, async (message: any, io: Server) => {
+    const { payload: { targets, subject, content } } = message;
+    try {
+        let recipientEmails: string[] = [];
+        
+        if (targets === "All Users" || targets === "Customers") {
+            const users = await AppDataSource.getRepository(UserEntity)
+                .createQueryBuilder("user")
+                .select("user.email")
+                .getMany();
+            recipientEmails.push(...users.map(u => u.email));
+        }
+        
+        if (targets === "All Users" || targets === "Professionals") {
+            const pros = await AppDataSource.getRepository(ProfessionalEntity)
+                .createQueryBuilder("pro")
+                .select("pro.email")
+                .getMany();
+            recipientEmails.push(...pros.map(p => p.email));
+        }
+
+        // Brevo typically has logic to chunk, but we can do it in our worker
+        // to avoid overwhelming sending if lists are huge.
+        const chunkSize = 50; 
+        for (let i = 0; i < recipientEmails.length; i += chunkSize) {
+            const chunk = recipientEmails.slice(i, i + chunkSize);
+            for (const email of chunk) {
+                await emailService.sendEmail(email, subject, content, subject);
+            }
+        }
+        console.log(`[BROADCAST_WORKER] ✅ Email broadcast sent to ${recipientEmails.length} recipients.`);
+    } catch (error) {
+        logger.error(`Error broadcasting emails:`, error);
+    }
+});
 
 export default notification;

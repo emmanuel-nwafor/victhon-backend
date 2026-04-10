@@ -8,6 +8,7 @@ import {
     ManyToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
+    OneToMany,
 } from "typeorm";
 import { Dispute } from "./Dispute";
 import { Escrow } from "./Escrow";
@@ -90,15 +91,8 @@ export class Transaction {
   @Column({ nullable: true })
   walletId?: string;
 
-  @ManyToOne(() => Dispute, (dispute) => dispute.transaction, {
-    nullable: true,
-    onDelete: "SET NULL",
-  })
-  @JoinColumn()
-  disputes?: Dispute;
-
-  @Column({ nullable: true })
-  disputeId?: string;
+  @OneToMany(() => Dispute, (dispute) => dispute.transaction)
+  disputes: Dispute[];
 
   // Your internal unique reference (tx_ref), e.g. "booking_xxx_1234567890"
   // Used for refund matching and RabbitMQ event routing

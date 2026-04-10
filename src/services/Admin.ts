@@ -7,6 +7,7 @@ import { Admin } from "../entities/Admin";
 import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
 import { PlatformSetting } from "../entities/PlatformSetting";
 import { Dispute, DisputeStatus } from "../entities/Dispute";
+import { Review } from "../entities/Review";
 import Service from "./Service";
 import { HttpStatus } from "../types/constants";
 import Password from "../utils/Password";
@@ -278,14 +279,32 @@ export default class AdminService extends Service {
             const userRepo = AppDataSource.getRepository(User);
             const user = await userRepo.findOne({
                 where: { id },
-                // Add relations if needed
+                relations: ["wallet", "setting"]
             });
 
             if (!user) {
                 return this.responseData(HttpStatus.NOT_FOUND, true, "User not found");
             }
 
-            return this.responseData(HttpStatus.OK, false, "User details fetched successfully", user);
+            const bookingRepo = AppDataSource.getRepository(Booking);
+            const bookings = await bookingRepo.find({
+                where: { user: { id } },
+                relations: ["professional", "services"],
+                order: { createdAt: "DESC" }
+            });
+
+            const reviewRepo = AppDataSource.getRepository(Review);
+            const reviews = await reviewRepo.find({
+                where: { user: { id } },
+                relations: ["professional"],
+                order: { createdAt: "DESC" }
+            });
+
+            return this.responseData(HttpStatus.OK, false, "User details fetched successfully", {
+                ...user,
+                bookings,
+                reviews
+            });
         } catch (error) {
             return this.handleTypeormError(error);
         }
@@ -296,14 +315,32 @@ export default class AdminService extends Service {
             const proRepo = AppDataSource.getRepository(Professional);
             const professional = await proRepo.findOne({
                 where: { id },
-                // Add relations if needed
+                relations: ["wallet", "setting", "schedules", "account", "ratingAggregate"]
             });
 
             if (!professional) {
                 return this.responseData(HttpStatus.NOT_FOUND, true, "Professional not found");
             }
 
-            return this.responseData(HttpStatus.OK, false, "Professional details fetched successfully", professional);
+            const bookingRepo = AppDataSource.getRepository(Booking);
+            const bookings = await bookingRepo.find({
+                where: { professional: { id } },
+                relations: ["user", "services"],
+                order: { createdAt: "DESC" }
+            });
+
+            const reviewRepo = AppDataSource.getRepository(Review);
+            const reviews = await reviewRepo.find({
+                where: { professional: { id } },
+                relations: ["user"],
+                order: { createdAt: "DESC" }
+            });
+
+            return this.responseData(HttpStatus.OK, false, "Professional details fetched successfully", {
+                ...professional,
+                bookings,
+                reviews
+            });
         } catch (error) {
             return this.handleTypeormError(error);
         }
@@ -475,6 +512,36 @@ export default class AdminService extends Service {
             }
 
             return this.responseData(HttpStatus.OK, false, "Dispute details fetched successfully", dispute);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async broadcast(data: { type: string; targets: string; content: string; subject?: string; title?: string }) {
+        try {
+            const { type, targets, content, subject, title } = data;
+            
+            // Queue to process the broadcast
+            const queueName = "victhon_notification_queue"; 
+            let eventType = "notification.broadcast_push";
+            let payload: any = { targets, content };
+
+            if (type === "email") {
+                eventType = "notification.broadcast_email";
+                payload.subject = subject;
+            } else if (type === "push") {
+                eventType = "notification.broadcast_push";
+                payload.title = title;
+            } else {
+                return this.responseData(HttpStatus.BAD_REQUEST, true, "Invalid broadcast type");
+            }
+
+            // Using dynamic require to avoid circular dependencies if RabbitMQ isn't exported at root
+            const { RabbitMQ } = require("./RabbitMQ");
+            
+            await RabbitMQ.publishToExchange(queueName, eventType, { payload });
+
+            return this.responseData(HttpStatus.OK, false, `Broadcast queued successfully to ${targets}`);
         } catch (error) {
             return this.handleTypeormError(error);
         }

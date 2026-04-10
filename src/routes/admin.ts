@@ -39,4 +39,6 @@ adminRouter.get("/disputes", controller.getDisputes);
 adminRouter.get("/disputes/:id", controller.getDisputeDetails);
 adminRouter.patch("/disputes/:id/resolve", controller.resolveDispute);
 
+adminRouter.post("/broadcast", controller.broadcast);
+
 export default adminRouter;
