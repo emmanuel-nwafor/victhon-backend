@@ -40,5 +40,7 @@ adminRouter.get("/disputes/:id", controller.getDisputeDetails);
 adminRouter.patch("/disputes/:id/resolve", controller.resolveDispute);
 
 adminRouter.post("/broadcast", controller.broadcast);
+adminRouter.get("/communication/stats", controller.getCommunicationStats);
+adminRouter.get("/communication/logs", controller.getBroadcastLogs);
 
 export default adminRouter;

@@ -7,6 +7,7 @@ import { Admin } from "../entities/Admin";
 import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
 import { PlatformSetting } from "../entities/PlatformSetting";
 import { Dispute, DisputeStatus } from "../entities/Dispute";
+import { Broadcast, BroadcastType } from "../entities/Broadcast";
 import { Review } from "../entities/Review";
 import Service from "./Service";
 import { HttpStatus } from "../types/constants";
@@ -218,7 +219,7 @@ export default class AdminService extends Service {
         try {
             const bookingRepo = AppDataSource.getRepository(Booking);
             const [bookings, total] = await bookingRepo.findAndCount({
-                relations: ["user", "professional", "services"],
+                relations: ["user", "professional", "services", "escrow"],
                 skip: (page - 1) * limit,
                 take: limit,
                 order: { createdAt: "DESC" },
@@ -521,27 +522,79 @@ export default class AdminService extends Service {
         try {
             const { type, targets, content, subject, title } = data;
             
-            // Queue to process the broadcast
-            const queueName = "victhon_notification_queue"; 
-            let eventType = "notification.broadcast_push";
-            let payload: any = { targets, content };
+            // 1. Save broadcast to history
+            const broadcastRepo = AppDataSource.getRepository(Broadcast);
+            const broadcast = broadcastRepo.create({
+                type: type as BroadcastType,
+                targets: targets,
+                title: (type === 'email' ? subject : title) || null,
+                content: content
+            } as any);
+            await broadcastRepo.save(broadcast);
 
+            // 2. Publish to Queue
+            const queueName = "victhon_notification_queue"; 
+            let eventType = type === "email" ? "notification.broadcast_email" : "notification.broadcast_push";
+            
+            let payload: any = { targets, content };
             if (type === "email") {
-                eventType = "notification.broadcast_email";
                 payload.subject = subject;
             } else if (type === "push") {
-                eventType = "notification.broadcast_push";
                 payload.title = title;
             } else {
-                return this.responseData(HttpStatus.BAD_REQUEST, true, "Invalid broadcast type");
+                return this.responseData(HttpStatus.OK, true, "Invalid broadcast type");
             }
 
-            // Using dynamic require to avoid circular dependencies if RabbitMQ isn't exported at root
             const { RabbitMQ } = require("./RabbitMQ");
             
-            await RabbitMQ.publishToExchange(queueName, eventType, { payload });
+            // CRITICAL: The consumer expects eventType to be INSIDE the message payload for routing
+            await RabbitMQ.publishToExchange(queueName, eventType, { 
+                eventType, // Added eventType here so RabbitMQ.startConsumer's handler router works
+                payload 
+            });
 
-            return this.responseData(HttpStatus.OK, false, `Broadcast queued successfully to ${targets}`);
+            return this.responseData(HttpStatus.OK, false, `Broadcast queued successfully to ${targets}`, broadcast);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async getCommunicationStats() {
+        try {
+            const userRepo = AppDataSource.getRepository(User);
+            const proRepo = AppDataSource.getRepository(Professional);
+            
+            const totalUsers = await userRepo.count();
+            const totalProfessionals = await proRepo.count();
+            
+            return this.responseData(HttpStatus.OK, false, "Communication stats fetched", {
+                totalAudience: totalUsers + totalProfessionals,
+                totalUsers,
+                totalProfessionals
+            });
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async getBroadcastLogs(page: number = 1, limit: number = 10) {
+        try {
+            const broadcastRepo = AppDataSource.getRepository(Broadcast);
+            const [broadcasts, total] = await broadcastRepo.findAndCount({
+                skip: (page - 1) * limit,
+                take: limit,
+                order: { createdAt: "DESC" }
+            });
+
+            return this.responseData(HttpStatus.OK, false, "Broadcast logs fetched", {
+                broadcasts,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit)
+                }
+            });
         } catch (error) {
             return this.handleTypeormError(error);
         }

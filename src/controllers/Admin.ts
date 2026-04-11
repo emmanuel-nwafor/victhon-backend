@@ -143,4 +143,16 @@ export default class AdminController extends Controller {
         const result = await this.adminService.broadcast(req.body);
         Controller.response(res, result);
     };
+
+    public getCommunicationStats = async (req: Request, res: Response) => {
+        const result = await this.adminService.getCommunicationStats();
+        Controller.response(res, result);
+    };
+
+    public getBroadcastLogs = async (req: Request, res: Response) => {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const result = await this.adminService.getBroadcastLogs(page, limit);
+        Controller.response(res, result);
+    };
 }
