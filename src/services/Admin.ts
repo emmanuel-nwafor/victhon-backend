@@ -1,7 +1,7 @@
 import { AppDataSource } from "../data-source";
 import { User } from "../entities/User";
 import { Professional } from "../entities/Professional";
-import { Transaction } from "../entities/Transaction";
+import { Transaction, TransactionStatus } from "../entities/Transaction";
 import { Booking } from "../entities/Booking";
 import { Admin } from "../entities/Admin";
 import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
@@ -168,7 +168,7 @@ export default class AdminService extends Service {
             const revenueResult = await transRepo
                 .createQueryBuilder("transaction")
                 .select("SUM(transaction.amount)", "total")
-                .where("transaction.status = :status", { status: "success" })
+                .where("transaction.status = :status", { status: TransactionStatus.SUCCESS })
                 .getRawOne();
 
             const recentTransactions = await transRepo.find({
@@ -190,7 +190,7 @@ export default class AdminService extends Service {
             const transactionsForAnalytic = await transRepo.find({
                 where: { 
                     createdAt: MoreThanOrEqual(sixMonthsAgo),
-                    status: "success"
+                    status: TransactionStatus.SUCCESS
                 },
                 select: ["createdAt", "amount"]
             });
