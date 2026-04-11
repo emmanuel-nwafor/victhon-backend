@@ -24,7 +24,7 @@ export class Broadcast {
     @Column()
     targets: string; // e.g., "All Users", "Professionals", "Customers"
 
-    @Column({ nullable: true })
+    @Column({ type: "varchar", length: 255, nullable: true })
     title!: string | null;
 
     @Column({ type: "text" })

@@ -11,6 +11,7 @@ import { Broadcast, BroadcastType } from "../entities/Broadcast";
 import { Review } from "../entities/Review";
 import Service from "./Service";
 import { HttpStatus } from "../types/constants";
+import { MoreThanOrEqual } from "typeorm";
 import Password from "../utils/Password";
 import env, { EnvKey } from "../config/env";
 
@@ -176,6 +177,51 @@ export default class AdminService extends Service {
                 take: 5
             });
 
+            // Analytics: Monthly trends (Last 6 months)
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+            sixMonthsAgo.setDate(1); // Start of month
+
+            const bookingsForAnalytic = await bookingRepo.find({
+                where: { createdAt: MoreThanOrEqual(sixMonthsAgo) },
+                select: ["createdAt"]
+            });
+
+            const transactionsForAnalytic = await transRepo.find({
+                where: { 
+                    createdAt: MoreThanOrEqual(sixMonthsAgo),
+                    status: "success"
+                },
+                select: ["createdAt", "amount"]
+            });
+
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const analytics: any[] = [];
+
+            for (let i = 0; i < 6; i++) {
+                const date = new Date();
+                date.setMonth(date.getMonth() - (5 - i));
+                const monthName = months[date.getMonth()];
+                const monthNum = date.getMonth();
+                const year = date.getFullYear();
+
+                const monthBookings = bookingsForAnalytic.filter(b => {
+                    const d = new Date(b.createdAt);
+                    return d.getMonth() === monthNum && d.getFullYear() === year;
+                }).length;
+
+                const monthRevenue = transactionsForAnalytic.filter(t => {
+                    const d = new Date(t.createdAt);
+                    return d.getMonth() === monthNum && d.getFullYear() === year;
+                }).reduce((sum, t) => sum + parseFloat(t.amount as any || 0), 0);
+
+                analytics.push({
+                    month: monthName,
+                    bookings: monthBookings,
+                    revenue: monthRevenue
+                });
+            }
+
             return this.responseData(HttpStatus.OK, false, "Stats fetched successfully", {
                 totalUsers,
                 totalProfessionals,
@@ -184,7 +230,8 @@ export default class AdminService extends Service {
                 pendingVerifications,
                 totalEscrowBalance: parseFloat(activeEscrowResult?.total || "0"),
                 totalRevenue: parseFloat(revenueResult?.total || "0"),
-                recentTransactions
+                recentTransactions,
+                analytics
             });
         } catch (error) {
             return this.handleTypeormError(error);
