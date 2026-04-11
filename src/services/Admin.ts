@@ -202,6 +202,16 @@ export default class AdminService extends Service {
                 select: ["createdAt", "amount"]
             });
 
+            const usersForAnalytic = await userRepo.find({
+                where: { createdAt: MoreThanOrEqual(sixMonthsAgo) },
+                select: ["createdAt"]
+            });
+
+            const prosForAnalytic = await proRepo.find({
+                where: { createdAt: MoreThanOrEqual(sixMonthsAgo) },
+                select: ["createdAt"]
+            });
+
             const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             const analytics: any[] = [];
 
@@ -222,10 +232,22 @@ export default class AdminService extends Service {
                     return d.getMonth() === monthNum && d.getFullYear() === year;
                 }).reduce((sum, t) => sum + parseFloat(t.amount as any || 0), 0);
 
+                const monthUsers = usersForAnalytic.filter(u => {
+                    const d = new Date(u.createdAt);
+                    return d.getMonth() === monthNum && d.getFullYear() === year;
+                }).length;
+
+                const monthPros = prosForAnalytic.filter(p => {
+                    const d = new Date(p.createdAt);
+                    return d.getMonth() === monthNum && d.getFullYear() === year;
+                }).length;
+
                 analytics.push({
                     month: monthName,
                     bookings: monthBookings,
-                    revenue: monthRevenue
+                    revenue: monthRevenue,
+                    buyers: monthUsers,
+                    providers: monthPros
                 });
             }
 
@@ -661,23 +683,27 @@ export default class AdminService extends Service {
             const userRepo = AppDataSource.getRepository(User);
             const proRepo = AppDataSource.getRepository(Professional);
 
+            const whereClause = query.trim() ? [
+                { firstName: Like(`%${query}%`) },
+                { lastName: Like(`%${query}%`) },
+                { email: Like(`%${query}%`) }
+            ] : {};
+
             const users = await userRepo.find({
-                where: [
-                    { firstName: Like(`%${query}%`) },
-                    { lastName: Like(`%${query}%`) },
-                    { email: Like(`%${query}%`) }
-                ],
-                take: 10
+                where: whereClause,
+                take: 20,
+                order: { createdAt: "DESC" }
             });
 
             const pros = await proRepo.find({
-                where: [
+                where: query.trim() ? [
                     { firstName: Like(`%${query}%`) },
                     { lastName: Like(`%${query}%`) },
                     { email: Like(`%${query}%`) },
                     { businessName: Like(`%${query}%`) }
-                ],
-                take: 10
+                ] : {},
+                take: 20,
+                order: { createdAt: "DESC" }
             });
 
             const results = [
