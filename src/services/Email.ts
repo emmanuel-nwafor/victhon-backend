@@ -73,14 +73,20 @@ export default class Email {
     `;
   }
 
-  public async sendEmail(to: string, subject: string, html: string, heroTitle?: string) {
+  public async sendEmail(to: string, subject: string, html: string, heroTitle?: string, attachments?: { content: string; name: string }[]) {
     try {
-      const result = await this.client.transactionalEmails.sendTransacEmail({
+      const emailParams: any = {
         sender: this.SENDER,
         to: [{ email: to }],
         subject: subject,
         htmlContent: this.emailWrapper(html, heroTitle),
-      });
+      };
+
+      if (attachments && attachments.length > 0) {
+        emailParams.attachment = attachments;
+      }
+
+      const result = await this.client.transactionalEmails.sendTransacEmail(emailParams);
       logger.info(`✅ Email sent to: ${to}`);
       return result;
     } catch (error) {

@@ -23,7 +23,8 @@ export default class AdminController extends Controller {
     public toggleUserStatus = async (req: Request, res: Response) => {
         const id = req.params.id as string;
         const { isActive } = req.body;
-        const result = await this.adminService.toggleUserStatus(id, isActive);
+        const adminId = (req as any).user?.id;
+        const result = await this.adminService.toggleUserStatus(id, isActive, adminId);
         Controller.response(res, result);
     };
 
@@ -37,7 +38,8 @@ export default class AdminController extends Controller {
     public toggleProfessionalStatus = async (req: Request, res: Response) => {
         const id = req.params.id as string;
         const { isActive } = req.body;
-        const result = await this.adminService.toggleProfessionalStatus(id, isActive);
+        const adminId = (req as any).user?.id;
+        const result = await this.adminService.toggleProfessionalStatus(id, isActive, adminId);
         Controller.response(res, result);
     };
 
@@ -51,7 +53,8 @@ export default class AdminController extends Controller {
     public verifyProfessional = async (req: Request, res: Response) => {
         const id = req.params.id as string;
         const { isVerified } = req.body;
-        const result = await this.adminService.verifyProfessional(id, isVerified);
+        const adminId = (req as any).user?.id;
+        const result = await this.adminService.verifyProfessional(id, isVerified, adminId);
         Controller.response(res, result);
     };
 
@@ -115,7 +118,8 @@ export default class AdminController extends Controller {
     };
 
     public updatePlatformSettings = async (req: Request, res: Response) => {
-        const result = await this.adminService.updatePlatformSettings(req.body);
+        const adminId = (req as any).user?.id;
+        const result = await this.adminService.updatePlatformSettings(req.body, adminId);
         Controller.response(res, result);
     };
 
@@ -129,7 +133,8 @@ export default class AdminController extends Controller {
     public resolveDispute = async (req: Request, res: Response) => {
         const id = req.params.id as string;
         const { action } = req.body;
-        const result = await this.adminService.resolveDispute(id, action);
+        const adminId = (req as any).user?.id;
+        const result = await this.adminService.resolveDispute(id, action, adminId);
         Controller.response(res, result);
     };
 
@@ -140,19 +145,34 @@ export default class AdminController extends Controller {
     };
 
     public broadcast = async (req: Request, res: Response) => {
-        const result = await this.adminService.broadcast(req.body);
+        const adminId = (req as any).user?.id;
+        const result = await this.adminService.broadcast(req.body, adminId);
         Controller.response(res, result);
     };
 
     public getCommunicationStats = async (req: Request, res: Response) => {
-        const result = await this.adminService.getCommunicationStats();
+        const result = await (this.adminService as any).getCommunicationStats();
         Controller.response(res, result);
     };
 
     public getBroadcastLogs = async (req: Request, res: Response) => {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 10;
-        const result = await this.adminService.getBroadcastLogs(page, limit);
+        const result = await (this.adminService as any).getBroadcastLogs(page, limit);
+        Controller.response(res, result);
+    };
+
+    public searchUsers = async (req: Request, res: Response) => {
+        const query = req.query.q as string;
+        if (!query) return Controller.response(res, (this.adminService as any).responseData(400, true, "Query is required", null));
+        const result = await this.adminService.searchUsers(query);
+        Controller.response(res, result);
+    };
+
+    public getActivityLogs = async (req: Request, res: Response) => {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const result = await this.adminService.getActivityLogs(page, limit);
         Controller.response(res, result);
     };
 }
