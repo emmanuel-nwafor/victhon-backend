@@ -160,7 +160,10 @@ export default class AdminService extends Service {
             const totalUsers = await userRepo.count();
             const totalProfessionals = await proRepo.count();
             const totalTransactions = await transRepo.count();
+            const disputeRepo = AppDataSource.getRepository(Dispute);
             const totalBookings = await bookingRepo.count();
+            const successfulTransactions = await transRepo.count({ where: { status: TransactionStatus.SUCCESS } });
+            const disputedTransactions = await disputeRepo.count();
 
             const pendingVerifications = await proRepo.countBy({ isVerified: false });
 
@@ -188,6 +191,7 @@ export default class AdminService extends Service {
             const sixMonthsAgo = new Date();
             sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
             sixMonthsAgo.setDate(1); // Start of month
+            sixMonthsAgo.setHours(0, 0, 0, 0); // Start of day midnight
 
             const bookingsForAnalytic = await bookingRepo.find({
                 where: { createdAt: MoreThanOrEqual(sixMonthsAgo) },
@@ -255,6 +259,8 @@ export default class AdminService extends Service {
                 totalUsers,
                 totalProfessionals,
                 totalTransactions,
+                successfulTransactions,
+                disputedTransactions,
                 totalBookings,
                 pendingVerifications,
                 totalEscrowBalance: parseFloat(activeEscrowResult?.total || "0"),
@@ -271,7 +277,7 @@ export default class AdminService extends Service {
         try {
             const transRepo = AppDataSource.getRepository(Transaction);
             const [transactions, total] = await transRepo.findAndCount({
-                relations: ["user", "professional"],
+                relations: ["user", "professional", "escrow", "escrow.booking", "escrow.booking.user", "escrow.booking.professional"],
                 skip: (page - 1) * limit,
                 take: limit,
                 order: { createdAt: "DESC" },
@@ -320,7 +326,7 @@ export default class AdminService extends Service {
             const bookingRepo = AppDataSource.getRepository(Booking);
             const booking = await bookingRepo.findOne({
                 where: { id },
-                relations: ["user", "professional", "services", "escrow", "reviews"],
+                relations: ["user", "professional", "services", "escrow"],
             });
 
             if (!booking) {
@@ -338,7 +344,7 @@ export default class AdminService extends Service {
             const transRepo = AppDataSource.getRepository(Transaction);
             const transaction = await transRepo.findOne({
                 where: { id },
-                relations: ["user", "professional", "booking"],
+                relations: ["user", "professional", "escrow", "escrow.booking", "escrow.booking.user", "escrow.booking.professional"],
             });
 
             if (!transaction) {
@@ -356,12 +362,12 @@ export default class AdminService extends Service {
             const userRepo = AppDataSource.getRepository(User);
             const user = await userRepo.findOne({
                 where: { id },
-                relations: ["wallet", "setting"]
+                relations: ["setting"]
             });
 
             if (!user) {
                 return this.responseData(HttpStatus.NOT_FOUND, true, "User not found");
-            }
+            }   
 
             const bookingRepo = AppDataSource.getRepository(Booking);
             const bookings = await bookingRepo.find({
