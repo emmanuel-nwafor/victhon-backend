@@ -2,6 +2,7 @@ import { Router } from "express";
 import AdminController from "../controllers/Admin";
 import verifyJWT from "../middlewares/verifyJWT";
 import { UserType } from "../types/constants";
+import { mediaUpload } from "../middlewares/multer";
 
 const adminRouter = Router();
 const controller = new AdminController();
@@ -39,7 +40,7 @@ adminRouter.get("/disputes", controller.getDisputes);
 adminRouter.get("/disputes/:id", controller.getDisputeDetails);
 adminRouter.patch("/disputes/:id/resolve", controller.resolveDispute);
 
-adminRouter.post("/broadcast", controller.broadcast);
+adminRouter.post("/broadcast", mediaUpload(1).array("attachments"), controller.broadcast);
 adminRouter.get("/communication/stats", controller.getCommunicationStats);
 adminRouter.get("/communication/logs", controller.getBroadcastLogs);
 adminRouter.get("/communication/search", controller.searchUsers);

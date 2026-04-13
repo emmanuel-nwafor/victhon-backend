@@ -154,12 +154,14 @@ notification.route(QueueEvents.NOTIFICATION_BROADCAST_PUSH, async (message: any,
         let recipientTokens: string[] = [];
         
         if (targetUserId) {
-            // Find specific user or pro token
-            const user = await AppDataSource.getRepository(UserEntity).findOne({ where: { id: targetUserId }, select: ["pushToken"] });
-            const pro = !user ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: targetUserId }, select: ["pushToken"] }) : null;
-            
-            if (user?.pushToken) recipientTokens.push(user.pushToken);
-            if (pro?.pushToken) recipientTokens.push(pro.pushToken);
+            const ids = Array.isArray(targetUserId) ? targetUserId : [targetUserId];
+            for (const id of ids) {
+                const user = await AppDataSource.getRepository(UserEntity).findOne({ where: { id }, select: ["pushToken"] });
+                const pro = !user ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id }, select: ["pushToken"] }) : null;
+                
+                if (user?.pushToken) recipientTokens.push(user.pushToken);
+                if (pro?.pushToken) recipientTokens.push(pro.pushToken);
+            }
         } else {
             if (targets === "All Users" || targets === "Customers") {
                 const users = await AppDataSource.getRepository(UserEntity)
@@ -198,11 +200,14 @@ notification.route(QueueEvents.NOTIFICATION_BROADCAST_EMAIL, async (message: any
         let recipientEmails: string[] = [];
         
         if (targetUserId) {
-            const user = await AppDataSource.getRepository(UserEntity).findOne({ where: { id: targetUserId }, select: ["email"] });
-            const pro = !user ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: targetUserId }, select: ["email"] }) : null;
-            
-            if (user?.email) recipientEmails.push(user.email);
-            if (pro?.email) recipientEmails.push(pro.email);
+            const ids = Array.isArray(targetUserId) ? targetUserId : [targetUserId];
+            for (const id of ids) {
+                const user = await AppDataSource.getRepository(UserEntity).findOne({ where: { id }, select: ["email"] });
+                const pro = !user ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id }, select: ["email"] }) : null;
+                
+                if (user?.email) recipientEmails.push(user.email);
+                if (pro?.email) recipientEmails.push(pro.email);
+            }
         } else {
             if (targets === "All Users" || targets === "Customers") {
                 const users = await AppDataSource.getRepository(UserEntity)

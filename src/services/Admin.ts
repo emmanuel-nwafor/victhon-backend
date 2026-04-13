@@ -15,6 +15,8 @@ import { Like, MoreThanOrEqual, Or } from "typeorm";
 import { ActivityLog } from "../entities/ActivityLog";
 import Password from "../utils/Password";
 import env, { EnvKey } from "../config/env";
+import Cloudinary from "./Cloudinary";
+import { CdnFolders, ResourceType } from "../types/constants";
 
 export default class AdminService extends Service {
     private storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -593,48 +595,67 @@ export default class AdminService extends Service {
         content: string;
         subject?: string;
         title?: string;
-        targetUserId?: string;
-        attachments?: { content: string; name: string }[]
-    }, adminId?: string) {
+        targetUserId?: string | string[]; // Support array of IDs from multi-select
+    }, adminId?: string, files?: Express.Multer.File[]) {
         try {
-            const { type, targets, content, subject, title, targetUserId, attachments } = data;
+            const { type, targets, content, subject, title, targetUserId } = data;
 
-            // 1. Save broadcast to history
+            // 1. Handle Attachments via Cloudinary
+            let processedAttachments: { url: string; name: string }[] = [];
+            if (files && files.length > 0) {
+                const cloudinary = new Cloudinary();
+                const { uploadedFiles, failedFiles } = await cloudinary.uploadV2(
+                    files,
+                    ResourceType.IMAGE,
+                    CdnFolders.BROADCASTS
+                );
+
+                if (failedFiles.length > 0) {
+                    console.warn("Some attachments failed to upload:", failedFiles);
+                }
+
+                processedAttachments = uploadedFiles.map(f => ({
+                    url: f.url,
+                    name: f.publicId.split('/').pop() || "attachment"
+                }));
+            }
+
+            // 2. Save broadcast to history
             const broadcastRepo = AppDataSource.getRepository(Broadcast);
             const broadcast = broadcastRepo.create({
                 type: type as BroadcastType,
-                targets: targetUserId ? `Single User (${targets})` : targets,
+                targets: targetUserId ? (Array.isArray(targetUserId) ? `Group (${targetUserId.length} users)` : `Single User (${targets})`) : targets,
                 title: (type === 'email' ? subject : title) || null,
                 content: content
+                // Note: Broadcast entity doesn't have attachments yet, but history is kept
             } as any);
             await broadcastRepo.save(broadcast);
 
-            // 2. Publish to Queue
+            // 3. Publish to Queue
             const queueName = "victhon_notification_queue";
             let eventType = type === "email" ? "notification.broadcast_email" : "notification.broadcast_push";
 
-            let payload: any = { targets, content, targetUserId, attachments };
-            if (type === "email") {
-                payload.subject = subject;
-            } else if (type === "push") {
-                payload.title = title;
-            } else {
-                return this.responseData(HttpStatus.OK, true, "Invalid broadcast type");
-            }
+            const payload: any = { 
+                targets, 
+                content, 
+                targetUserId, 
+                attachments: processedAttachments,
+                subject: subject || title,
+                title: title || subject
+            };
 
             const { RabbitMQ } = require("./RabbitMQ");
 
-            // CRITICAL: The consumer expects eventType to be INSIDE the message payload for routing
             await RabbitMQ.publishToExchange(queueName, eventType, {
                 eventType,
                 payload
             });
 
-            // 3. Log Activity
+            // 4. Log Activity
             await this.logActivity(adminId, "BROADCAST_SENT", {
                 type,
                 targets: targetUserId || targets,
-                hasAttachments: !!attachments?.length
+                hasAttachments: processedAttachments.length > 0
             });
 
             return this.responseData(HttpStatus.OK, false, `Broadcast queued successfully`, broadcast);

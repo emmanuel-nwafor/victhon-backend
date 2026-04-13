@@ -146,7 +146,7 @@ export default class AdminController extends Controller {
 
     public broadcast = async (req: Request, res: Response) => {
         const adminId = (req as any).user?.id;
-        const result = await this.adminService.broadcast(req.body, adminId);
+        const result = await this.adminService.broadcast(req.body, adminId, req.files as Express.Multer.File[]);
         Controller.response(res, result);
     };
 

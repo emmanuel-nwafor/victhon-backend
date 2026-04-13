@@ -56,6 +56,7 @@ export enum CdnFolders {
     USERPICTURES = "victhon-cdn/profile-pictures/users/pictures",
     SERVICES = "victhon-cdn/professionals/services",
     CHAT = "victhon-cdn/chats/",
+    BROADCASTS = "victhon-cdn/broadcasts",
 }
 
 export enum AdminPermission {

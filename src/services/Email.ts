@@ -73,17 +73,48 @@ export default class Email {
     `;
   }
 
-  public async sendEmail(to: string, subject: string, html: string, heroTitle?: string, attachments?: { content: string; name: string }[]) {
+  public async sendEmail(to: string, subject: string, html: string, heroTitle?: string, attachments?: { content?: string; url?: string; name: string }[]) {
     try {
+      let finalHtml = html;
+
+      // Enhance layout: Embed attachments visually in the body if they exist
+      if (attachments && attachments.length > 0) {
+        const attachmentLinks = attachments.map(att => {
+          const isImage = att.url && /\.(jpg|jpeg|png|webp|gif)$/i.test(att.url);
+          if (isImage) {
+            return `
+              <div style="margin-top: 24px; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden;">
+                <img src="${att.url}" alt="${att.name}" style="display: block; width: 100%; height: auto;" />
+              </div>
+            `;
+          }
+          return `
+            <div style="margin-top: 16px; padding: 16px; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Attachment</p>
+              <a href="${att.url || "#"}" style="display: block; margin-top: 4px; font-size: 15px; color: ${this.BRAND_GREEN}; font-weight: 800; text-decoration: none;">📎 ${att.name}</a>
+            </div>
+          `;
+        }).join("");
+
+        finalHtml += `
+          <div style="margin-top: 48px; border-top: 1px solid #f1f5f9; pt-32px;">
+            ${attachmentLinks}
+          </div>
+        `;
+      }
+
       const emailParams: any = {
         sender: this.SENDER,
         to: [{ email: to }],
         subject: subject,
-        htmlContent: this.emailWrapper(html, heroTitle),
+        htmlContent: this.emailWrapper(finalHtml, heroTitle),
       };
 
       if (attachments && attachments.length > 0) {
-        emailParams.attachment = attachments;
+        emailParams.attachment = attachments.map(att => ({
+          name: att.name,
+          ...(att.url ? { url: att.url } : { content: att.content })
+        }));
       }
 
       const result = await this.client.transactionalEmails.sendTransacEmail(emailParams);
