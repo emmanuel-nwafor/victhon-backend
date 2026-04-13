@@ -80,11 +80,14 @@ export default class Email {
       // Enhance layout: Embed attachments visually in the body if they exist
       if (attachments && attachments.length > 0) {
         const attachmentLinks = attachments.map(att => {
-          const isImage = att.url && /\.(jpg|jpeg|png|webp|gif)$/i.test(att.url);
+          // Robust image detection: check extension in URL or name, or if it's a known image provider
+          const isImage = (att.url && /\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(att.url)) || 
+                          (att.name && /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(att.name));
+
           if (isImage) {
             return `
-              <div style="margin-top: 24px; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden;">
-                <img src="${att.url}" alt="${att.name}" style="display: block; width: 100%; height: auto;" />
+              <div style="margin-top: 24px; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; background-color: #f8fafc;">
+                <img src="${att.url}" alt="${att.name}" style="display: block; width: 100%; height: auto; max-width: 600px; margin: 0 auto;" />
               </div>
             `;
           }
@@ -97,7 +100,7 @@ export default class Email {
         }).join("");
 
         finalHtml += `
-          <div style="margin-top: 48px; border-top: 1px solid #f1f5f9; pt-32px;">
+          <div style="margin-top: 48px; border-top: 1px solid #f1f5f9; padding-top: 32px;">
             ${attachmentLinks}
           </div>
         `;
