@@ -1,8 +1,8 @@
-import PushNotificationService from "./src/services/PushNotificationService";
-import { AppDataSource } from "./src/data-source";
-import { UserType } from "./src/types/constants";
-import { User } from "./src/entities/User";
-import { Professional } from "./src/entities/Professional";
+import PushNotificationService from "../src/services/PushNotificationService";
+import { AppDataSource } from "../src/data-source";
+import { UserType } from "../src/types/constants";
+import { User } from "../src/entities/User";
+import { Professional } from "../src/entities/Professional";
 import { Not, IsNull } from "typeorm";
 
 async function test() {
@@ -11,7 +11,7 @@ async function test() {
         console.log("Connected to Database");
 
         const pushService = new PushNotificationService();
-        
+
         // Find a User with a pushToken
         const userRepo = AppDataSource.getRepository(User);
         const user = await userRepo.findOne({ where: { pushToken: Not(IsNull()) } });
@@ -35,7 +35,7 @@ async function test() {
         }
 
         process.exit(0);
-    } catch(e) {
+    } catch (e) {
         console.error("Failed:", e);
         process.exit(1);
     }

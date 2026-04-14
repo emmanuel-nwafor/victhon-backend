@@ -1,5 +1,5 @@
-import { AppDataSource } from "./src/data-source";
-import { normalizeEmail } from "./src/utils/normalizeEmail";
+import { AppDataSource } from "../src/data-source";
+import { normalizeEmail } from "../src/utils/normalizeEmail";
 
 AppDataSource.initialize().then(async () => {
     const users = await AppDataSource.query(`SELECT id, email FROM \`users\``);
@@ -17,7 +17,7 @@ AppDataSource.initialize().then(async () => {
             }
         }
     }
-    
+
     const pros = await AppDataSource.query(`SELECT id, email FROM \`professionals\``);
     for (const p of pros) {
         const norm = normalizeEmail(p.email);

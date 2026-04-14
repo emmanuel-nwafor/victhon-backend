@@ -108,6 +108,9 @@ export default class Authentication extends Service {
         
         let user = await userRepo.findOneBy({ email });
         if (user) {
+          if (!user.isActive) {
+            return this.responseData(403, true, "Your account has been suspended. Please contact support.");
+          }
           user.authProvider = AuthProvider.GOOGLE;
           await userRepo.save(user);
           const token = this.generateUserToken({ id: user.id, userType: UserType.USER }, UserType.USER);
@@ -121,6 +124,9 @@ export default class Authentication extends Service {
         // Check if they exist as a professional
         const existingPro = await proRepo.findOneBy({ email });
         if (existingPro) {
+          if (!existingPro.isActive) {
+            return this.responseData(403, true, "Your account has been suspended. Please contact support.");
+          }
           return this.responseData(409, true, "This email is already registered as a Professional. Please log in as a Professional.");
         }
 
@@ -129,6 +135,7 @@ export default class Authentication extends Service {
           firstName,
           lastName,
           isVerified: true,
+          isActive: true, // Explicitly set to active for new users
           authProvider: AuthProvider.GOOGLE,
           profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
         });
@@ -160,6 +167,9 @@ export default class Authentication extends Service {
         
         let pro = await professionalRepo.findOneBy({ email });
         if (pro) {
+          if (!pro.isActive) {
+            return this.responseData(403, true, "Your account has been suspended. Please contact support.");
+          }
           pro.authProvider = AuthProvider.GOOGLE;
           await professionalRepo.save(pro);
           const token = this.generateUserToken(
@@ -189,6 +199,9 @@ export default class Authentication extends Service {
         // Check if they exist as a user
         const existingUser = await userRepo.findOneBy({ email });
         if (existingUser) {
+          if (!existingUser.isActive) {
+            return this.responseData(403, true, "Your account has been suspended. Please contact support.");
+          }
           return this.responseData(409, true, "This email is already registered as a Customer. Please log in as a Customer.");
         }
 
@@ -197,6 +210,7 @@ export default class Authentication extends Service {
           firstName,
           lastName,
           isVerified: true,
+          isActive: true, // Explicitly set to active for new pros
           authProvider: AuthProvider.GOOGLE,
           profilePicture: picture ? { url: picture, publicId: "google_pfp" } : null,
           location: `POINT(${0} ${0})` as any,

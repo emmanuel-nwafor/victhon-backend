@@ -1,6 +1,6 @@
-import { AppDataSource } from "./src/data-source";
-import { User } from "./src/entities/User";
-import { Professional } from "./src/entities/Professional";
+import { AppDataSource } from "../src/data-source";
+import { User } from "../src/entities/User";
+import { Professional } from "../src/entities/Professional";
 import { Not, IsNull } from "typeorm";
 
 async function check() {
@@ -15,7 +15,7 @@ async function check() {
         console.log(`Professionals with pushToken: ${prosWithToken}`);
 
         process.exit(0);
-    } catch(e) {
+    } catch (e) {
         console.error(e);
         process.exit(1);
     }

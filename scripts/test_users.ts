@@ -1,14 +1,13 @@
-import "dotenv/config";
-import { AppDataSource } from "./src/data-source";
-import { User } from "./src/entities/User";
+import { AppDataSource } from "../src/data-source";
+import { User } from "../src/entities/User";
 
 async function test() {
     console.log("Connecting database...");
     await AppDataSource.initialize();
-    
+
     console.log("Querying users...");
     const userRepo = AppDataSource.getRepository(User);
-    
+
     try {
         const result = await userRepo.findAndCount();
         console.log("SUCCESS. Total users:", result[1]);
@@ -17,7 +16,7 @@ async function test() {
         console.error("ERROR QUERYING USERS:");
         console.error(e);
     }
-    
+
     await AppDataSource.destroy();
     process.exit(0);
 }

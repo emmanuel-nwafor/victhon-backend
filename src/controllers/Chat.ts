@@ -20,12 +20,25 @@ export default class Chat {
         const {senderId, senderType, content} = req.body;
         const {chatId} = req.params;
 
+        const files = req.files as Express.Multer.File[];
+        const MAX_SIZE = 1.5 * 1024 * 1024; // 1.5 MB
+
+        if (files) {
+            for (const file of files) {
+                if (file.size > MAX_SIZE) {
+                    const deleteFiles = require("../utils/deleteFiles").default;
+                    await deleteFiles(files);
+                    return res.status(400).json({ error: true, message: `File ${file.originalname} exceeds the 1.5MB limit.` });
+                }
+            }
+        }
+
         const serviceResult = await Chat.service.sendAttachment(
             senderId,
             senderType,
             chatId!,
             content ?? null,
-            req.files as Express.Multer.File[]);
+            files);
 
         Controller.response(res, serviceResult);
     }
