@@ -15,6 +15,8 @@ import {
     userBookings,
     disputeBooking
 } from '../middlewares/routes/booking';
+import uploads from '../middlewares/multer';
+import { ResourceType } from '../types/constants';
 
 const booking = Router();
 
@@ -33,7 +35,7 @@ booking.patch("/reject/:bookingId", rejectBooking, asyncHandler(Controller.rejec
 booking.patch("/complete/:bookingId", completeBooking, asyncHandler(Controller.completeBooking));
 booking.patch("/review/:bookingId", reviewBooking, asyncHandler(Controller.reviewBooking));
 booking.patch("/cancel/:bookingId", cancelBooking, asyncHandler(Controller.cancelBooking));
-booking.post("/dispute/:bookingId", disputeBooking, asyncHandler(Controller.disputeBooking));
+booking.post("/dispute/:bookingId", uploads(ResourceType.IMAGE).array("evidence"), disputeBooking, asyncHandler(Controller.disputeBooking));
 
 
 // booking.post("/schedule", asyncHandler(Controller.createSchedule));

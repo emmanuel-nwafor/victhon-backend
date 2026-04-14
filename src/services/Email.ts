@@ -81,8 +81,8 @@ export default class Email {
       if (attachments && attachments.length > 0) {
         const attachmentLinks = attachments.map(att => {
           // Robust image detection: check extension in URL or name, or if it's a known image provider
-          const isImage = (att.url && /\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(att.url)) || 
-                          (att.name && /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(att.name));
+          const isImage = (att.url && /\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(att.url)) ||
+            (att.name && /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(att.name));
 
           if (isImage) {
             return `
@@ -127,6 +127,85 @@ export default class Email {
       logger.error(`❌ Email send failed to ${to}:`, error instanceof Error ? error.message : String(error));
       return false;
     }
+  }
+
+  // ─── Booking Receipt ─────────────────────────────────────────────────────────
+
+  public async sendBookingReceipt(email: string, name: string, bookingData: any) {
+    const { id, amount, startDateTime, professional, services } = bookingData;
+    const date = new Date(startDateTime).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    const time = new Date(startDateTime).toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const servicesHtml = services.map((s: any) => `
+      <tr>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+          <p style="margin: 0; font-size: 15px; color: #0f172a; font-weight: 600;">${s.name}</p>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #64748b;">Professional Service</p>
+        </td>
+        <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9; text-align: right;">
+          <p style="margin: 0; font-size: 15px; color: #0f172a; font-weight: 700;">₦${Number(s.price).toLocaleString()}</p>
+        </td>
+      </tr>
+    `).join("");
+
+    const html = `
+      <p style="font-size: 16px; color: #475569; line-height: 1.7; margin: 0 0 32px;">
+        Hi <strong>${name}</strong>, thank you for your payment. Your booking has been confirmed and the funds are held securely in escrow.
+      </p>
+
+      <div style="background-color: #f8fafc; border-radius: 16px; padding: 32px; margin-bottom: 40px; border: 1px solid #e2e8f0;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding-bottom: 24px;">
+              <p style="margin: 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Booking ID</p>
+              <p style="margin: 4px 0 0; font-size: 14px; color: #0f172a; font-weight: 700;">#${id.substring(0, 8).toUpperCase()}</p>
+            </td>
+            <td style="padding-bottom: 24px; text-align: right;">
+              <p style="margin: 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Status</p>
+              <p style="margin: 4px 0 0; font-size: 14px; color: ${this.BRAND_GREEN}; font-weight: 700;">PAID & SECURED</p>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <p style="margin: 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Date</p>
+              <p style="margin: 4px 0 0; font-size: 14px; color: #0f172a; font-weight: 700;">${date}</p>
+            </td>
+            <td style="text-align: right;">
+              <p style="margin: 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Time</p>
+              <p style="margin: 4px 0 0; font-size: 14px; color: #0f172a; font-weight: 700;">${time}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <h3 style="font-size: 18px; color: #0f172a; font-weight: 800; margin-bottom: 16px;">Order Summary</h3>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
+        ${servicesHtml}
+        <tr>
+          <td style="padding: 24px 0 0;">
+            <p style="margin: 0; font-size: 16px; color: #0f172a; font-weight: 800;">Total Amount Paid</p>
+          </td>
+          <td style="padding: 24px 0 0; text-align: right;">
+            <p style="margin: 0; font-size: 20px; color: ${this.BRAND_GREEN}; font-weight: 800;">₦${Number(amount).toLocaleString()}</p>
+          </td>
+        </tr>
+      </table>
+
+      <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 20px; margin-bottom: 40px;">
+        <p style="margin: 0; font-size: 14px; color: #92400e; line-height: 1.6;">
+          <strong>Escrow Protection:</strong> Your payment is held safely by Victhon. We only release the funds to <strong>${professional.businessName}</strong> once you confirm the job is completed to your satisfaction.
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail(email, "Your Booking Receipt — Victhon", html, "Payment Received");
   }
 
   // ─── Welcome Email ────────────────────────────────────────────────────────────

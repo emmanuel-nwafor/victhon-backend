@@ -10,6 +10,8 @@ import Payment from "../services/Payment";
 import {NotificationType} from "../entities/Notification";
 import {AppDataSource} from "../data-source";
 import {Transaction} from "../entities/Transaction";
+import { Booking } from "../entities/Booking";
+import Email from "../services/Email";
 
 const service = new BaseService();
 
@@ -45,8 +47,29 @@ payment.route(QueueEvents.PAYMENT_BOOK_SUCCESSFUL, async (message: any, io: Serv
 
     try {
         const transactionRepo = AppDataSource.getRepository(Transaction);
+        const bookingRepo = AppDataSource.getRepository(Booking);
 
-        const result = await transactionRepo.findOne({where: {id: transactionId}});
+        const result = await transactionRepo.findOne({
+            where: {id: transactionId},
+            relations: ["escrow", "escrow.booking"]
+        });
+
+        if (result && result.escrow && result.escrow.booking) {
+            const bookingId = result.escrow.booking.id;
+            const detailedBooking = await bookingRepo.findOne({
+                where: { id: bookingId },
+                relations: ["user", "professional", "services"]
+            });
+
+            if (detailedBooking) {
+                const emailService = new Email();
+                await emailService.sendBookingReceipt(
+                    detailedBooking.user.email,
+                    detailedBooking.user.firstName,
+                    detailedBooking
+                );
+            }
+        }
 
         await notify({
             userId: professionalId,

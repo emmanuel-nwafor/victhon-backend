@@ -727,7 +727,7 @@ export default class BookingService extends Service {
         }
     }
 
-    public async disputeBooking(bookingId: string, userId: string, reason?: string) {
+    public async disputeBooking(bookingId: string, userId: string, reason?: string, evidenceUrls?: string[]) {
         try {
             const booking = await this.repo.findOne({
                 where: { id: bookingId, userId },
@@ -748,7 +748,7 @@ export default class BookingService extends Service {
 
             // Payment service handles the heavy lifting of updates to escrow, transactions, and wallet
             const paymentService = new Payment();
-            const result = await paymentService.dispute(booking.id, reason);
+            const result = await paymentService.dispute(booking.id, reason, evidenceUrls);
 
             if (!result) {
                 return this.responseData(HttpStatus.INTERNAL_SERVER_ERROR, true, "Could not process dispute");

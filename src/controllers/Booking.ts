@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import Controller from "./Controller";
 import Service from "../services/Booking";
+import Cloudinary from "../services/Cloudinary";
+import { CdnFolders, ResourceType } from "../types/constants";
 
 
 export default class Booking {
@@ -136,8 +138,33 @@ export default class Booking {
         const { id: userId } = res.locals.data;
         const { bookingId } = req.params;
         const { reason } = req.body;
+        const files = req.files as Express.Multer.File[];
 
-        const serviceResult = await Booking.service.disputeBooking(bookingId!, userId, reason);
+        let evidenceUrls: string[] = [];
+
+        if (files && files.length > 0) {
+            const cloudinary = new Cloudinary();
+            const { uploadedFiles, failedFiles } = await cloudinary.uploadV2(
+                files,
+                ResourceType.IMAGE,
+                CdnFolders.DISPUTES
+            );
+
+            if (failedFiles.length > 0) {
+                return Controller.response(res, {
+                    statusCode: 500,
+                    json: {
+                        error: true,
+                        message: "Some evidence files failed to upload",
+                        data: failedFiles
+                    }
+                });
+            }
+
+            evidenceUrls = uploadedFiles.map(file => file.url);
+        }
+
+        const serviceResult = await Booking.service.disputeBooking(bookingId!, userId, reason, evidenceUrls);
 
         Controller.response(res, serviceResult);
     }
