@@ -147,7 +147,6 @@ export default class User extends Service {
             const updatedData: any = {
                 email: editData.email ?? user.email,
                 phone: editData.phone ?? user.phone,
-                isActive: editData.isActive ?? user.isActive,
                 profilePicture: profilePicture!,
             };
 

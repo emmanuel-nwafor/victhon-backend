@@ -8,7 +8,7 @@ export default class Chat {
     private static service = new Service();
 
 
-    public static async create(req: Request, res: Response) {
+    public static async create(req: Request, res: Response): Promise<void> {
         const {professionalId, userId} = req.body;
 
         const serviceResult = await Chat.service.createChat(userId, professionalId);
@@ -16,7 +16,7 @@ export default class Chat {
         Controller.response(res, serviceResult);
     }
 
-    public static async sendAttachment(req: Request, res: Response) {
+    public static async sendAttachment(req: Request, res: Response): Promise<void> {
         const {senderId, senderType, content} = req.body;
         const {chatId} = req.params;
 
@@ -28,7 +28,8 @@ export default class Chat {
                 if (file.size > MAX_SIZE) {
                     const deleteFiles = require("../utils/deleteFiles").default;
                     await deleteFiles(files);
-                    return res.status(400).json({ error: true, message: `File ${file.originalname} exceeds the 1.5MB limit.` });
+                    res.status(400).json({ error: true, message: `File ${file.originalname} exceeds the 1.5MB limit.` });
+                    return;
                 }
             }
         }
@@ -43,7 +44,7 @@ export default class Chat {
         Controller.response(res, serviceResult);
     }
 
-    public static async getMessages(req: Request, res: Response) {
+    public static async getMessages(req: Request, res: Response): Promise<void> {
         const {id: userId, userType} = res.locals.data;
         let {page, limit} = req.query;
         const {chatId} = req.params;
@@ -57,7 +58,7 @@ export default class Chat {
         Controller.response(res, serviceResult);
     }
 
-    public static async getChat(req: Request, res: Response) {
+    public static async getChat(req: Request, res: Response): Promise<void> {
         const {id: userId, userType} = res.locals.data;
         const {chatId} = req.params;
 
@@ -66,7 +67,7 @@ export default class Chat {
         Controller.response(res, serviceResult);
     }
 
-    public static async getChats(req: Request, res: Response) {
+    public static async getChats(req: Request, res: Response): Promise<void> {
         const {id: userId, userType} = res.locals.data;
         let {page, limit} = req.query;
 

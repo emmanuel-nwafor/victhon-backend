@@ -50,4 +50,12 @@ export default class Professional {
         const serviceResult = await Professional.service.savePushToken(userId, pushToken);
         Controller.response(res, serviceResult);
     }
+
+    public static async updateAvailability(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { availability } = req.body;
+
+        const serviceResult = await Professional.service.updateAvailability(userId, availability);
+        Controller.response(res, serviceResult);
+    }
 }

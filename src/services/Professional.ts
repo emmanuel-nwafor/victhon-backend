@@ -252,7 +252,6 @@ export default class Professional extends Service {
                 baseCity: editData.baseCity ?? professional.baseCity,
                 currentAddress: editData.currentAddress ?? professional.currentAddress,
                 availability: editData.availability ?? professional.availability,
-                isActive: editData.isActive ?? professional.isActive,
                 profilePicture: profilePicture!,
                 businessLogo: businessLogo!,
                 businessName: editData.businessName ?? professional.businessName,

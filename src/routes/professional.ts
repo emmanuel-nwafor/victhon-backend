@@ -9,6 +9,7 @@ professional.get("/", asyncHandler(Controller.profile));
 professional.patch("/", editProfessionalValidator, asyncHandler(Controller.editProfessionalProfile));
 professional.post("/setup-business-profile", setupBusinessProfileValidator, asyncHandler(Controller.setupBusinessProfile));
 professional.patch("/push-token", asyncHandler(Controller.savePushToken));
+professional.patch("/availability", asyncHandler(Controller.updateAvailability));
 
 // professional.get("/views", asyncHandler(Controller.views));
 // professional.patch("/profile-photo", validatePhotoField, asyncHandler(Controller.uploadProfilePicture));
