@@ -23,6 +23,24 @@ const PORT = env(EnvKey.PORT)!;
     try {
         logger.info(`Starting Victhon Backend on port ${PORT}`);
 
+        // Verify essential environment variables
+        const essentialEnvVars = [
+            EnvKey.TOKEN_SECRET,
+            EnvKey.DATABASE_URL,
+            EnvKey.REDIS_URL,
+            EnvKey.RABBIT_MQ,
+            EnvKey.STORED_SALT
+        ];
+
+        essentialEnvVars.forEach(key => {
+            const val = env(key);
+            if (!val) {
+                logger.warn(`⚠️ Missing essential environment variable: ${key}`);
+            } else {
+                logger.info(`✅ Environment variable loaded: ${key} (length: ${val.length})`);
+            }
+        });
+
         redisClient.on("connect", () => {
             logger.info(`Redis connected on port ${redisClient.options.port}`);
         });

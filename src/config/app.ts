@@ -74,7 +74,11 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
 
     app.use("/api/v1/auth", auth);
     app.use("/api/v1/users", verifyJWT([UserType.USER]), user);
+
+    // Specific sub-routes first to prevent shadowing by general routes
+    app.use("/api/v1/professionals/wallets", verifyJWT([UserType.PROFESSIONAL]), wallet);
     app.use("/api/v1/professionals", verifyJWT([UserType.PROFESSIONAL]), professional);
+
     app.use("/api/v1/accounts", verifyJWT([UserType.PROFESSIONAL]), account);
     app.use("/api/v1/schedules", schedule);
     app.use("/api/v1/bookings", booking);
@@ -83,7 +87,6 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use("/api/v1/payments", payment);
     app.use("/api/v1/chats", chat);
     app.use("/api/v1/settings", verifyJWT([UserType.USER, UserType.PROFESSIONAL]), setting);
-    app.use("/api/v1/professionals/wallets", verifyJWT([UserType.PROFESSIONAL]), wallet);
     app.use("/api/v1/admin", admin);
 
 
@@ -143,9 +146,15 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
         }
     });
 
+    app.get("/", (req: Request, res: Response) => {
+        res.status(200).json({
+            error: false,
+            message: "Victhon API is running",
+            version: "1.0.0"
+        });
+    });
+
     app.get("/ping", async (req: Request, res: Response) => {
-
-
         res.status(200).json({
             error: false,
             message: "pinging api"
@@ -155,6 +164,8 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
 
 
     app.use(multerErrorHandler);
+
+    // Global 404 handler
     app.use((req: Request, res: Response, next: NextFunction) => {
         console.warn(`Unmatched route: ${req.method} ${req.path}`);
         res.status(404).json({
@@ -162,6 +173,20 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
             message: "Route not found. Please check the URL or refer to the API documentation.",
         });
         return;
+    });
+
+    // Global error handler
+    app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+        logger.error(`Unhandled error: ${err.message}`, {
+            stack: err.stack,
+            method: req.method,
+            path: req.path,
+            body: req.body
+        });
+        res.status(err.status || 500).json({
+            error: true,
+            message: err.message || "An unexpected internal error occurred."
+        });
     });
 
     return { server, io };

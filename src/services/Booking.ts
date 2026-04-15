@@ -170,6 +170,7 @@ export default class BookingService extends Service {
                 data,
             );
         } catch (error) {
+            console.error("[BOOKING_SERVICE] createBooking failed:", error);
             return this.handleTypeormError(error);
         }
     }
