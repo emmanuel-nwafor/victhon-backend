@@ -8,6 +8,7 @@ export default class Authentication {
     private static service = new Service();
 
     public static async signUp(req: Request, res: Response) {
+        console.log(`[AUTH_CONTROLLER] Entering signUp for email: ${req.body?.email}`);
         const { email, password } = req.body;
 
         const serviceResult = await Authentication.service.signUp(email, password);
@@ -15,6 +16,7 @@ export default class Authentication {
     }
 
     public static async login(req: Request, res: Response) {
+        console.log(`[AUTH_CONTROLLER] Entering login for email: ${req.body?.email}`);
         const { email, password } = req.body;
         const serviceResult = await Authentication.service.login(email, password);
         res.status(serviceResult.statusCode).json(serviceResult.json);
@@ -38,6 +40,7 @@ export default class Authentication {
     // }
 
     public static async professionalLogin(req: Request, res: Response) {
+        console.log(`[AUTH_CONTROLLER] Entering professionalLogin for email: ${req.body?.email}`);
         const { email, password } = req.body;
         const serviceResult = await Authentication.service.professionalLogin(email, password);
         res.status(serviceResult.statusCode).json(serviceResult.json);

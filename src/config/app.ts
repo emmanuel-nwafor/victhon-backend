@@ -37,6 +37,20 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     const server = http.createServer(app);
     const io = await initializeIO(server, pubClient, subClient);
 
+    // 1. Request Entry Diagnostic Logging
+    app.use((req: Request, res: Response, next: NextFunction) => {
+        // Detailed log for potential preflights and auth attempts
+        logger.info(`🛫 Incoming: ${req.method} ${req.path}`);
+        next();
+    });
+
+    // 2. CORS - Must be handled before OTHER middlewares (like helmet or static)
+    app.use(cors({ origin: '*' }));
+    app.options('*', cors());
+
+    // 3. Morgan Logging - Early to capture all traffic
+    app.use(morgan("combined", { stream }));
+
     app.use(
         '/api/v1/payments/webhook',
         express.json({
@@ -50,8 +64,6 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     app.use(helmet());
     app.set('trust proxy', 1); // For a single proxy (e.g., Render)
     app.use(express.urlencoded({ extended: true }));
-    app.use(cors({ origin: '*' }))
-    app.use(morgan("combined", { stream }));
     app.use(express.json());
 
     // Configure session with RedisStore
@@ -188,6 +200,31 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
             message: err.message || "An unexpected internal error occurred."
         });
     });
+
+    // Route Listing Diagnostic Utility
+    const routes: string[] = [];
+    app._router.stack.forEach((middleware: any) => {
+        if (middleware.name === 'router') {
+            const prefix = middleware.regexp.toString()
+                .replace('/^\\', '')
+                .replace('\\/?(?=\\/|$)/i', '')
+                .replace('\\/?(?=\\/|$)/?', '')
+                .replace(/\\\//g, '/');
+            
+            if (middleware.handle && middleware.handle.stack) {
+                middleware.handle.stack.forEach((handler: any) => {
+                    if (handler.route) {
+                        const methods = Object.keys(handler.route.methods).join(',').toUpperCase();
+                        routes.push(`[${methods}] ${prefix}${handler.route.path}`);
+                    }
+                });
+            }
+        } else if (middleware.route) {
+            const methods = Object.keys(middleware.route.methods).join(',').toUpperCase();
+            routes.push(`[${methods}] ${middleware.route.path}`);
+        }
+    });
+    logger.info(`✅ Successfully registered ${routes.length} routes.`);
 
     return { server, io };
 }
