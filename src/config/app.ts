@@ -46,7 +46,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
 
     // 2. CORS - Must be handled before OTHER middlewares (like helmet or static)
     app.use(cors({ origin: '*' }));
-    app.options('*', cors());
+    app.options('(.*)', cors());
 
     // 3. Morgan Logging - Early to capture all traffic
     app.use(morgan("combined", { stream }));
