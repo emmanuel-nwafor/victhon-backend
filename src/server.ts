@@ -137,6 +137,12 @@ const PORT = env(EnvKey.PORT)!;
             logger.info(`🌍 External URL: https://victhon-backend-khau.onrender.com`);
         });
 
+        // TCP-level connection diagnostic
+        serverInstance.on('connection', (socket) => {
+            const remoteIP = socket.remoteAddress;
+            logger.info(`🔌 [TCP_CONN] New connection established from: ${remoteIP}`);
+        });
+
         serverInstance.on('error', (err) => {
             logger.error('❌ Server failed to start:', err);
         });
