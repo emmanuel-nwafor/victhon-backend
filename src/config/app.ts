@@ -53,7 +53,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
 
 
     // app.use(helmet());
-    // app.set('trust proxy', 1); // For a single proxy (e.g., Render)
+    app.set('trust proxy', 1); // IMPORTANT for Render to recognize external requests
     app.use(express.urlencoded({ extended: true }));
     app.use(cors({ origin: '*' }));
     app.use(morgan("combined", { stream }));

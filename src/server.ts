@@ -141,6 +141,11 @@ const PORT = env(EnvKey.PORT)!;
         serverInstance.on('connection', (socket) => {
             const remoteIP = socket.remoteAddress;
             logger.info(`🔌 [TCP_CONN] New connection established from: ${remoteIP}`);
+            
+            // Log when we actually receive the first byte of data
+            socket.once('data', (data) => {
+                logger.info(`📥 [TCP_DATA] Received ${data.length} bytes from ${remoteIP}: ${data.toString().slice(0, 30).replace(/\r\n/g, ' ')}...`);
+            });
         });
 
         serverInstance.on('error', (err) => {
