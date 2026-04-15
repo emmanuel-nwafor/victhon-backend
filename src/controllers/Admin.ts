@@ -8,6 +8,7 @@ export default class AdminController extends Controller {
     private authService: Authentication = new Authentication();
 
     public login = async (req: Request, res: Response) => {
+        console.log(`[ADMIN_CONTROLLER] Entering login for email: ${req.body?.email}`);
         const { email, password } = req.body;
         const result = await this.authService.adminLogin(email, password);
         Controller.response(res, result);
