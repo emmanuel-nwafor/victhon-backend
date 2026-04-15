@@ -132,7 +132,14 @@ const PORT = env(EnvKey.PORT)!;
             if (IWorker.drained) worker.on('drained', IWorker.drained);
         }
 
-        app.listen(PORT, () => logger.info(`Server listening on port ${PORT}`));
+        const serverInstance = app.listen(PORT, () => {
+            logger.info(`🚀 Server successfully listening on port ${PORT}`);
+            logger.info(`🌍 External URL: https://victhon-backend-khau.onrender.com`);
+        });
+
+        serverInstance.on('error', (err) => {
+            logger.error('❌ Server failed to start:', err);
+        });
     } catch (error) {
         logger.error("Initialization error:", error);
     }

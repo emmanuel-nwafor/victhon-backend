@@ -37,6 +37,11 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     const server = http.createServer(app);
     const io = await initializeIO(server, pubClient, subClient);
 
+    // 0. HEALTH BYPASS (No middleware)
+    app.get("/api/v1/health-bypass", (req: Request, res: Response) => {
+        res.status(200).json({ status: "OK", bypass: true });
+    });
+
     app.use(
         '/api/v1/payments/webhook',
         express.json({
