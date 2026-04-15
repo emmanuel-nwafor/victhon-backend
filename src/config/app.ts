@@ -43,9 +43,8 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
         next();
     });
 
-    // 2. CORS - FIXED: Changed '(.*)' to '*' to prevent path-to-regexp error
+    // 2. CORS - Handles all methods including OPTIONS
     app.use(cors({ origin: '*' }));
-    app.options('*', cors()); // Changed from app.options('(.*)', cors())
 
     // 3. Morgan Logging
     app.use(morgan("combined", { stream }));
