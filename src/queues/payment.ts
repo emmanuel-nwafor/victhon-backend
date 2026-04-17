@@ -12,6 +12,7 @@ import {AppDataSource} from "../data-source";
 import {Transaction} from "../entities/Transaction";
 import { Booking } from "../entities/Booking";
 import Email from "../services/Email";
+import Chat from "../services/Chat";
 
 const service = new BaseService();
 
@@ -80,6 +81,33 @@ payment.route(QueueEvents.PAYMENT_BOOK_SUCCESSFUL, async (message: any, io: Serv
 
         logger.info(`e👌 Booking payment was completed for transaction:${transactionId}`);
     } catch (error) {
+        service.handleTypeormError(error);
+    }
+});
+
+payment.route(QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL, async (message: any, io: Server) => {
+    const { payload: { bookingId, userId, professionalId } } = message;
+
+    try {
+        const chatService = new Chat();
+        // Create the chat. If it already exists, it will throw an error we can catch.
+        await chatService.createChat(userId, professionalId).catch(err => {
+            logger.info(`Chat already exists or could not be created: ${err.message}`);
+        });
+
+        const bookingRepo = AppDataSource.getRepository(Booking);
+        const booking = await bookingRepo.findOne({ where: { id: bookingId }, relations: ["user"] });
+
+        await notify({
+            userId: professionalId,
+            userType: UserType.PROFESSIONAL,
+            type: NotificationType.BOOKING_PAYMENT, // Use a specific type if available, otherwise this works
+            data: { message: `A user has paid a commitment fee for a booking. You can now chat with ${booking?.user?.firstName}.`, bookingId }
+        });
+
+        logger.info(`💬 Chat unlocked and professional notified for booking:${bookingId}`);
+    } catch (error: any) {
+        logger.error(`Error handling commitment success: ${error.message}`);
         service.handleTypeormError(error);
     }
 });

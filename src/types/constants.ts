@@ -256,6 +256,7 @@ export enum QueueEvents {
     PAYMENT_BOOK_SUCCESSFUL = "payment.book_successful",
     PAYMENT_REFUND_SUCCESSFUL = "payment.refund_successful",
     PAYMENT_REFUND_FAILED = "payment.refund_failed",
+    PAYMENT_COMMITMENT_SUCCESSFUL = "payment.commitment_successful",
     WALLET_ESCROW_RELEASE = "wallet.escrow_release",
     CHAT_RECEIVE_MESSAGE = "chat.receive_message",
     CHAT_MARK_AS_READ = "chat.mark_as_read",

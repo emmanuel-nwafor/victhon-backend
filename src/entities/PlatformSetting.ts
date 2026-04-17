@@ -18,6 +18,12 @@ export class PlatformSetting {
     @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
     fixedFee: number;
 
+    @Column({ type: "decimal", precision: 10, scale: 2, default: 2000 })
+    commitmentFee: number;
+
+    @Column({ type: "int", default: 48 })
+    autoRefundHours: number;
+
     @CreateDateColumn()
     createdAt: Date;
 

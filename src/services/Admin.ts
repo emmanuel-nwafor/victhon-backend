@@ -481,7 +481,7 @@ export default class AdminService extends Service {
             let settings = await settingsRepo.findOne({ where: {} }); // Assume 1 global row
             if (!settings) {
                 // Initialize default
-                settings = settingsRepo.create({ platformFeePercentage: 10, fixedFee: 0 });
+                settings = settingsRepo.create({ platformFeePercentage: 10, fixedFee: 0, commitmentFee: 2000, autoRefundHours: 48 });
                 await settingsRepo.save(settings!);
             }
             return this.responseData(HttpStatus.OK, false, "Platform Settings fetched", settings);
@@ -497,11 +497,15 @@ export default class AdminService extends Service {
             if (!settings) {
                 settings = settingsRepo.create({
                     platformFeePercentage: data.platformFeePercentage,
-                    fixedFee: data.fixedFee
+                    fixedFee: data.fixedFee,
+                    commitmentFee: data.commitmentFee,
+                    autoRefundHours: data.autoRefundHours
                 });
             } else {
                 if (data.platformFeePercentage !== undefined) settings.platformFeePercentage = data.platformFeePercentage;
                 if (data.fixedFee !== undefined) settings.fixedFee = data.fixedFee;
+                if (data.commitmentFee !== undefined) settings.commitmentFee = data.commitmentFee;
+                if (data.autoRefundHours !== undefined) settings.autoRefundHours = data.autoRefundHours;
             }
             await settingsRepo.save(settings!);
             return this.responseData(HttpStatus.OK, false, "Platform Settings updated", settings);

@@ -51,6 +51,62 @@ export default class Payment extends BaseService {
     });
   }
 
+  public async initializeCommitmentPayment(bookingId: string, userId: string) {
+    try {
+      const booking = await this.bookingRepo.findOne({
+        where: { id: bookingId, userId },
+        relations: ["user", "professional.wallet"],
+      });
+
+      if (!booking) return this.responseData(404, true, "Booking not found");
+      if (booking.isChatUnlocked) return this.responseData(400, true, "Chat is already unlocked for this booking");
+
+      const amount = Number(booking.commitmentFee);
+      if (amount <= 0) return this.responseData(400, true, "Invalid commitment fee amount");
+
+      const tx_ref = `commitment_${booking.id}_${Date.now()}`;
+      const transaction = this.transactionRepo.create({
+        userId,
+        type: TransactionType.COMMITMENT_FEE,
+        amount,
+        status: TransactionStatus.PENDING,
+        reference: tx_ref,
+      });
+      await this.transactionRepo.save(transaction);
+
+      const response = await this.flwClient.post("/payments", {
+        tx_ref,
+        amount,
+        currency: "NGN",
+        redirect_url: this.FLW_REDIRECT_URL,
+        customer: {
+          email: booking.user.email,
+          name: `${booking.user.firstName} ${booking.user.lastName}`,
+        },
+        meta: {
+          type: TransactionType.COMMITMENT_FEE,
+          transactionId: transaction.id,
+          bookingId: booking.id,
+          userId,
+        },
+        customizations: {
+          title: "Booking Commitment Fee",
+          description: `Unlock chat for booking #${bookingId}`,
+        },
+      });
+
+      if (response.data?.status === "success") {
+        return this.responseData(200, false, "Commitment fee payment initiated", {
+          payment_link: response.data.data.link,
+          tx_ref,
+        });
+      }
+      return this.responseData(500, true, "Payment initialization failed");
+    } catch (error) {
+      return this.handleTypeormError(error);
+    }
+  }
+
   public async initializeBookingPayment(bookingId: string, userId: string) {
     try {
       const booking = await this.bookingRepo.findOne({
@@ -95,10 +151,15 @@ export default class Payment extends BaseService {
 
       const tx_ref = `booking_${booking.id}_${Date.now()}`;
 
+      // Calculate balance to pay
+      const amountToPay = booking.isChatUnlocked 
+        ? Number(booking.amount) - Number(booking.commitmentFee)
+        : Number(booking.amount);
+
       const transaction = this.transactionRepo.create({
         userId,
         type: TransactionType.BOOKING_DEPOSIT,
-        amount: booking.escrow.amount,
+        amount: amountToPay,
         escrowId: booking.escrow.id,
         status: TransactionStatus.FAILED,
         reference: tx_ref,
@@ -467,6 +528,35 @@ export default class Payment extends BaseService {
               professionalId: escrow.booking.professionalId,
             },
           };
+        } else if (payment.type === TransactionType.COMMITMENT_FEE) {
+            const bookingId = payment.reference?.split('_')[1]; 
+            if (!bookingId) {
+                logger.error(`Invalid commitment fee reference: ${payment.reference}`);
+                throw new Error("Invalid commitment fee reference");
+            }
+
+            const booking = await manager.findOne(Booking, { 
+                where: { id: bookingId },
+                relations: ["user", "professional"]
+            });
+
+            if (booking && !booking.isChatUnlocked) {
+                booking.isChatUnlocked = true;
+                booking.status = BookingStatus.CHATTING;
+                await manager.save(booking);
+
+                // Initialize Chat using ChatService (import correctly if needed or generic creation)
+                // For now, we'll use a direct chat creation logic or a queue event
+                eventToPublish = {
+                    queueName: QueueNames.PAYMENT,
+                    eventType: QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL,
+                    payload: {
+                        bookingId: booking.id,
+                        userId: booking.userId,
+                        professionalId: booking.professionalId
+                    }
+                };
+            }
         }
 
         logger.info(

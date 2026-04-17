@@ -23,6 +23,7 @@ export enum TransactionType {
   ESCROW_RELEASE = "escrow_release",
   REFUND = "refund",
   DISPUTE = "dispute",
+  COMMITMENT_FEE = "commitment_fee",
 }
 
 export enum TransactionStatus {

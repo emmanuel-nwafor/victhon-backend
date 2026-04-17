@@ -71,15 +71,15 @@ const PORT = env(EnvKey.PORT)!;
         await AppDataSource.initialize()
             .then(async () => {
                 logger.info("Database connected successfully");
-                
+
                 // Initialize default admin if none exist
                 try {
                     const adminRepo = AppDataSource.getRepository(Admin);
-                    
+
                     const email = env(EnvKey.DEFAULT_ADMIN_EMAIL);
                     const rawPassword = env(EnvKey.DEFAULT_ADMIN_PASSWORD);
                     const storedSalt = env(EnvKey.STORED_SALT);
-                    
+
                     if (email && rawPassword && storedSalt) {
                         const password = Password.hashPassword(rawPassword, storedSalt);
                         const existingAdmin = await adminRepo.findOneBy({ email });
@@ -140,8 +140,8 @@ const PORT = env(EnvKey.PORT)!;
         // TCP-level connection diagnostic
         serverInstance.on('connection', (socket) => {
             const remoteIP = socket.remoteAddress;
-            logger.info(`🔌 [TCP_CONN] New connection established from: ${remoteIP}`);
-            
+            // logger.info(`🔌 [TCP_CONN] New connection established from: ${remoteIP}`);
+
             // Log when we actually receive the first byte of data
             socket.once('data', (data) => {
                 logger.info(`📥 [TCP_DATA] Received ${data.length} bytes from ${remoteIP}: ${data.toString().slice(0, 30).replace(/\r\n/g, ' ')}...`);
@@ -186,5 +186,20 @@ cron.schedule('0 0 * * *', async () => {
         console.error('Auto-escrow release cron failed', err);
     } finally {
         isEscrowRunning = false;
+    }
+});
+
+let isAutoRefundRunning = false;
+// Run every hour to auto-refund/cancel inactive bookings
+cron.schedule('0 * * * *', async () => {
+    if (isAutoRefundRunning) return;
+    isAutoRefundRunning = true;
+    try {
+        const bookingService = new BookingService();
+        await bookingService.autoRefundInactiveBookings();
+    } catch (err) {
+        console.error('Auto-refund cron failed', err);
+    } finally {
+        isAutoRefundRunning = false;
     }
 });

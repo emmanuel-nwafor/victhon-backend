@@ -1,6 +1,7 @@
-import { In, IsNull, LessThanOrEqual, MoreThanOrEqual, Not, Or } from "typeorm";
+import { In, IsNull, LessThan, LessThanOrEqual, MoreThanOrEqual, Not, Or } from "typeorm";
 import { AppDataSource } from "../data-source";
 import { Booking, BookingStatus } from "../entities/Booking";
+import { PlatformSetting } from "../entities/PlatformSetting";
 import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
 import { NotificationType } from "../entities/Notification";
 import { Professional } from "../entities/Professional";
@@ -19,6 +20,7 @@ import notify from "./notify";
 import Payment from "./Payment";
 import { RabbitMQ } from "./RabbitMQ";
 import Service from "./Service";
+import logger from "../config/logger";
 
 export default class BookingService extends Service {
     private readonly repo = AppDataSource.getRepository(Booking);
@@ -101,7 +103,15 @@ export default class BookingService extends Service {
                 });
 
                 if (existingBookings.length > 0) {
-                    throw new Error("Current booking overlaps with existing booking");
+                    const schedule = await manager.find(ProfessionalSchedule, {
+                        where: { professionalId, isActive: true },
+                        order: { dayOfWeek: "ASC", startTime: "ASC" }
+                    });
+                    throw {
+                        message: "Current booking overlaps with existing booking",
+                        data: { schedule },
+                        statusCode: 409
+                    };
                 }
 
                 // --- Step 3: Validate schedule ---
@@ -113,7 +123,15 @@ export default class BookingService extends Service {
                 );
 
                 if (!isAvailable) {
-                    throw new Error("Professional not available at requested time");
+                    const schedule = await manager.find(ProfessionalSchedule, {
+                        where: { professionalId, isActive: true },
+                        order: { dayOfWeek: "ASC", startTime: "ASC" }
+                    });
+                    throw {
+                        message: "Professional not available at requested time",
+                        data: { schedule },
+                        statusCode: 409
+                    };
                 }
 
                 // const location = (longitude && latitude ? `POINT(${longitude} ${latitude})` : `POINT(${0} ${0})`) as any;
@@ -129,15 +147,22 @@ export default class BookingService extends Service {
                     totalPrice += Number(items.price);
                 }
 
+                // Fetch platform settings for commitment fee
+                const settingsRepo = manager.getRepository(PlatformSetting);
+                const settings = await settingsRepo.findOne({ where: {} });
+                const commitmentFee = Number(settings?.commitmentFee || 2000);
+
                 // --- Step 4: Create booking ---
                 const booking = manager.create(Booking, {
                     userId,
                     professionalId,
-                    status: BookingStatus.PENDING,
+                    status: BookingStatus.AWAITING_COMMITMENT,
                     startDateTime,
                     endDateTime,
                     // location,
                     amount: totalPrice,
+                    commitmentFee,
+                    isChatUnlocked: false,
                     ...(address && { address }),
                 });
 
@@ -169,8 +194,11 @@ export default class BookingService extends Service {
                 "Professional was booked successfully",
                 data,
             );
-        } catch (error) {
+        } catch (error: any) {
             console.error("[BOOKING_SERVICE] createBooking failed:", error);
+            if (error.statusCode === 409) {
+                return this.responseData(409, true, error.message, error.data);
+            }
             return this.handleTypeormError(error);
         }
     }
@@ -761,6 +789,33 @@ export default class BookingService extends Service {
         }
     }
 
+    public async adjustBookingPrice(bookingId: string, proId: string, newTotalAmount: number) {
+        try {
+            const result = await AppDataSource.transaction(async (manager) => {
+                const booking = await manager.findOne(Booking, {
+                    where: { id: bookingId, professionalId: proId },
+                    relations: ["escrow"],
+                    lock: { mode: "pessimistic_write" },
+                });
+
+                if (!booking) throw new Error("Booking not found");
+                if (![BookingStatus.CHATTING, BookingStatus.AWAITING_COMMITMENT, BookingStatus.ACCEPTED].includes(booking.status)) {
+                    throw new Error("Cannot adjust price at this stage");
+                }
+
+                booking.amount = newTotalAmount;
+                booking.escrow.amount = newTotalAmount;
+
+                await manager.save([booking, booking.escrow]);
+                return booking;
+            });
+
+            return this.responseData(200, false, "Booking price adjusted successfully", result);
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
     public async autoCompleteReviewBookings() {
         try {
             const seventyTwoHoursAgo = new Date();
@@ -786,6 +841,44 @@ export default class BookingService extends Service {
             }
         } catch (error) {
             console.error("[Cron] Error in autoCompleteReviewBookings:", error);
+        }
+    }
+
+    public async autoRefundInactiveBookings() {
+        try {
+            // Fetch platform settings for timeout
+            const settingsRepo = AppDataSource.getRepository(PlatformSetting);
+            const settings = await settingsRepo.findOne({ where: {} });
+            const timeoutHours = Number(settings?.autoRefundHours || 48);
+
+            const timeoutThreshold = new Date();
+            timeoutThreshold.setHours(timeoutThreshold.getHours() - timeoutHours);
+
+            const inactiveBookings = await AppDataSource.getRepository(Booking).find({
+                where: {
+                    status: In([BookingStatus.AWAITING_COMMITMENT, BookingStatus.CHATTING]),
+                    createdAt: LessThan(timeoutThreshold)
+                },
+                relations: ["user", "professional"]
+            });
+
+            for (const booking of inactiveBookings) {
+                if (booking.status === BookingStatus.CHATTING && booking.isChatUnlocked) {
+                    // This means they paid commitment fee but pro likely didn't respond
+                    // Need a way to trigger refund via Payment service
+                    // For now, mark as cancelled and log for manual review or call refund service
+                    booking.status = BookingStatus.CANCELLED;
+                    await AppDataSource.getRepository(Booking).save(booking);
+
+                    logger.info(`[AUTO_REFUND] Booking ${booking.id} cancelled due to inactivity. Refund needed.`);
+                    // TODO: call Payment.refundBooking(booking.id, booking.userId)
+                } else if (booking.status === BookingStatus.AWAITING_COMMITMENT) {
+                    booking.status = BookingStatus.CANCELLED;
+                    await AppDataSource.getRepository(Booking).save(booking);
+                }
+            }
+        } catch (error) {
+            console.error("Auto-refund cron failed", error);
         }
     }
 }

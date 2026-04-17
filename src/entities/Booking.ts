@@ -25,7 +25,9 @@ export enum BookingStatus {
     REJECTED = "rejected",
     REVIEW = "review",
     DISPUTED = "disputed",
-    ON_THE_WAY = "on_the_way"
+    ON_THE_WAY = "on_the_way",
+    AWAITING_COMMITMENT = "awaiting_commitment",
+    CHATTING = "chatting"
 }
 
 export enum PaymentStatus {
@@ -86,6 +88,12 @@ export class Booking {
 
     @Column({ type: 'decimal', precision: 10, scale: 2 })
     amount: number;
+
+    @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    commitmentFee: number;
+
+    @Column({ default: false })
+    isChatUnlocked: boolean;
 
     @Column({ type: 'text', nullable: true })
     notes: string;
