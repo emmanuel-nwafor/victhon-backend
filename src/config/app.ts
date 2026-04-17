@@ -52,8 +52,8 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     );
 
 
-    // app.use(helmet());
-    app.set('trust proxy', 1); // IMPORTANT for Render to recognize external requests
+    app.use(helmet());
+    app.set('trust proxy', 1);
     app.use(express.urlencoded({ extended: true }));
     app.use(cors({ origin: '*' }));
     app.use(morgan("combined", { stream }));
@@ -66,8 +66,8 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
         resave: false,
         saveUninitialized: false,
         cookie: {
-            secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-            maxAge: 1000 * 60 * 60 * 24 // 1 day expiration (adjust as needed)
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 1000 * 60 * 60 * 24
         }
     }));
 

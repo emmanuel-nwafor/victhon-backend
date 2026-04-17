@@ -14,7 +14,7 @@ import { Transaction, TransactionStatus, TransactionType } from "../entities/Tra
 import { Booking, BookingStatus } from "../entities/Booking";
 import { In, LessThanOrEqual, MoreThanOrEqual, Not } from "typeorm";
 import { Wallet } from "../entities/Wallet";
-import { Escrow } from "../entities/Escrow";
+import { Escrow, EscrowStatus } from "../entities/Escrow";
 import env, { EnvKey } from "../config/env";
 
 const service = new BaseService();
@@ -45,6 +45,11 @@ wallet.route(QueueEvents.WALLET_ESCROW_RELEASE, async (message: any) => {
             if (!escrow) {
                 logger.error(`Escrow ${escrowId} not found`);
                 throw new Error("Escrow not found");
+            }
+
+            if (![EscrowStatus.PAID, EscrowStatus.RELEASED].includes(escrow.status)) {
+                logger.error(`Escrow ${escrowId} is not in a releasable state: ${escrow.status}`);
+                throw new Error(`Escrow is not in a releasable state`);
             }
 
             amountToReleaseVal = Number(escrow.amount);

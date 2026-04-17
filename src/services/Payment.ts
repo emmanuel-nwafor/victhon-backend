@@ -555,23 +555,12 @@ export default class Payment extends BaseService {
           return;
         }
 
-        const wallet = transaction.wallet;
-        if (!wallet) {
-          logger.error(`Wallet not found`);
-          return;
-        }
-
         booking.status = BookingStatus.DISPUTED;
-        wallet.pendingAmount =
-          Number(wallet.pendingAmount) - Number(transaction.amount);
-        wallet.totalBalance =
-          Number(wallet.balance) + Number(wallet.pendingAmount);
 
         await manager.save([
           transaction,
           disputeTx,
           escrow,
-          wallet,
           booking,
           newDispute,
         ]);
@@ -848,7 +837,7 @@ export default class Payment extends BaseService {
         .addSelect("pro.pin")
         .where("pro.id = :id", { id: userId })
         .getOne();
-      
+
       const accountDetails = pro?.account?.[0] || null;
       return this.responseData(200, false, "Successfully checked PIN status", { hasPin: !!pro?.pin, account: accountDetails });
     } catch (error) {
@@ -859,10 +848,10 @@ export default class Payment extends BaseService {
   public async setupPin(userId: string, pin: string) {
     try {
       if (!pin || pin.length < 4) return this.responseData(400, true, "PIN must be at least 4 characters");
-      
+
       const Password = require("../utils/Password").default;
       const hashedPin = Password.hashPassword(pin, env(EnvKey.STORED_SALT)!);
-      
+
       await this.proRepo.update({ id: userId }, { pin: hashedPin });
       return this.responseData(200, false, "PIN setup successfully");
     } catch (error) {
@@ -959,132 +948,132 @@ export default class Payment extends BaseService {
         .getOne();
 
       if (!pro || !pro.pin) return this.responseData(400, true, "PIN not set up");
-      
+
       const Password = require("../utils/Password").default;
       const isValid = Password.compare(pin, pro.pin, env(EnvKey.STORED_SALT)!);
       if (!isValid) return this.responseData(400, true, "Invalid PIN");
 
       const existingAccount = await this.accountRepo.findOne({
-          where: { professionalId: userId, isLocked: true },
+        where: { professionalId: userId, isLocked: true },
       }) || await this.accountRepo.findOne({
-          where: { professionalId: userId },
-          order: { createdAt: "ASC" }
+        where: { professionalId: userId },
+        order: { createdAt: "ASC" }
       });
- 
+
       let usedAccount: Account;
- 
+
       if (existingAccount) {
-          bankCode = existingAccount.bankCode;
-          accountNumber = existingAccount.accountNumber;
-          narration = `Withdrawal to ${existingAccount.name}`;
-          usedAccount = existingAccount;
+        bankCode = existingAccount.bankCode;
+        accountNumber = existingAccount.accountNumber;
+        narration = `Withdrawal to ${existingAccount.name}`;
+        usedAccount = existingAccount;
       } else {
-          if (!accountDetails || !accountDetails.bankCode || !accountDetails.accountNumber) {
-              return this.responseData(400, true, "Bank details are required to set up your first withdrawal account.");
-          }
-          
-          const newAccount = this.accountRepo.create({
-              professionalId: userId,
-              name: accountDetails.accountName || "Professional",
-              accountNumber: accountDetails.accountNumber,
-              bankCode: accountDetails.bankCode,
-              bankName: accountDetails.bankName || "Unknown Bank",
-              isLocked: false // Will be locked after successful initiation
-          });
-          usedAccount = await this.accountRepo.save(newAccount);
- 
-          bankCode = usedAccount.bankCode;
-          accountNumber = usedAccount.accountNumber;
-          narration = `Withdrawal to ${usedAccount.name}`;
+        if (!accountDetails || !accountDetails.bankCode || !accountDetails.accountNumber) {
+          return this.responseData(400, true, "Bank details are required to set up your first withdrawal account.");
+        }
+
+        const newAccount = this.accountRepo.create({
+          professionalId: userId,
+          name: accountDetails.accountName || "Professional",
+          accountNumber: accountDetails.accountNumber,
+          bankCode: accountDetails.bankCode,
+          bankName: accountDetails.bankName || "Unknown Bank",
+          isLocked: false // Will be locked after successful initiation
+        });
+        usedAccount = await this.accountRepo.save(newAccount);
+
+        bankCode = usedAccount.bankCode;
+        accountNumber = usedAccount.accountNumber;
+        narration = `Withdrawal to ${usedAccount.name}`;
       }
 
       const reference = `wd_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 
       // DB Transaction for local update
       const result = await AppDataSource.transaction(async (manager) => {
-          // Lock wallet
-          const lockedWallet = await manager.findOne(Wallet, {
-              where: { id: wallet.id },
-              lock: { mode: "pessimistic_write" },
-          });
+        // Lock wallet
+        const lockedWallet = await manager.findOne(Wallet, {
+          where: { id: wallet.id },
+          lock: { mode: "pessimistic_write" },
+        });
 
-          if (!lockedWallet || lockedWallet.balance < amount) {
-              throw new Error("Insufficient balance during processing");
-          }
+        if (!lockedWallet || lockedWallet.balance < amount) {
+          throw new Error("Insufficient balance during processing");
+        }
 
-          // Deduct from balance
-          lockedWallet.balance = Number(lockedWallet.balance) - amount;
-          lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
-          await manager.save(lockedWallet);
+        // Deduct from balance
+        lockedWallet.balance = Number(lockedWallet.balance) - amount;
+        lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
+        await manager.save(lockedWallet);
 
-          // Create transaction record
-          const tx = manager.create(Transaction, {
-              professionalId: userId,
-              type: TransactionType.WITHDRAWAL,
-              status: TransactionStatus.PROCESSING,
-              amount: amount,
-              reference: reference,
-              wallet: lockedWallet
-          });
-          await manager.save(tx);
-          return { lockedWallet, tx };
+        // Create transaction record
+        const tx = manager.create(Transaction, {
+          professionalId: userId,
+          type: TransactionType.WITHDRAWAL,
+          status: TransactionStatus.PROCESSING,
+          amount: amount,
+          reference: reference,
+          wallet: lockedWallet
+        });
+        await manager.save(tx);
+        return { lockedWallet, tx };
       });
 
       // Call Flutterwave API
       try {
-          const response = await this.flwClient.post("/transfers", {
-              account_bank: bankCode,
-              account_number: accountNumber,
-              amount: Math.round(amount), // NGN
-              narration: narration,
-              currency: "NGN",
-              reference,
-              debit_currency: "NGN",
-          });
+        const response = await this.flwClient.post("/transfers", {
+          account_bank: bankCode,
+          account_number: accountNumber,
+          amount: Math.round(amount), // NGN
+          narration: narration,
+          currency: "NGN",
+          reference,
+          debit_currency: "NGN",
+        });
 
-          const transferData = response.data;
+        const transferData = response.data;
 
-          if (transferData?.status !== "success") {
-              throw new Error(transferData?.message ?? "Transfer initiation failed");
-          }
- 
-          // Lock the account after successful initiation
-          if (!usedAccount.isLocked) {
-              await this.accountRepo.update({ id: usedAccount.id }, { isLocked: true });
-              logger.info(`🔒 Account ${usedAccount.id} has been locked for security after first withdrawal.`);
-          }
- 
-          return this.responseData(
-              200,
-              false,
-              "Withdrawal initiated successfully",
-              transferData.data
-          );
+        if (transferData?.status !== "success") {
+          throw new Error(transferData?.message ?? "Transfer initiation failed");
+        }
+
+        // Lock the account after successful initiation
+        if (!usedAccount.isLocked) {
+          await this.accountRepo.update({ id: usedAccount.id }, { isLocked: true });
+          logger.info(`🔒 Account ${usedAccount.id} has been locked for security after first withdrawal.`);
+        }
+
+        return this.responseData(
+          200,
+          false,
+          "Withdrawal initiated successfully",
+          transferData.data
+        );
       } catch (flwError: any) {
-          const errorMessage = flwError.response?.data?.message || flwError.message || "Transfer initiation failed. Please try again later.";
-          logger.error("Flutterwave API failed", flwError.response?.data || flwError.message);
-          
-          await AppDataSource.transaction(async (manager) => {
-              const lockedWallet = await manager.findOne(Wallet, {
-                  where: { id: wallet.id },
-                  lock: { mode: "pessimistic_write" }
-              });
-              const failedTx = await manager.findOne(Transaction, { where: { id: result.tx.id }});
-              
-              if (lockedWallet && failedTx) {
-                  lockedWallet.balance = Number(lockedWallet.balance) + amount;
-                  lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
-                  failedTx.status = TransactionStatus.FAILED;
-                  await manager.save([lockedWallet, failedTx]);
-               }
-           });
- 
-           return this.responseData(
-               500,
-               true,
-               errorMessage
-           );
-       }
+        const errorMessage = flwError.response?.data?.message || flwError.message || "Transfer initiation failed. Please try again later.";
+        logger.error("Flutterwave API failed", flwError.response?.data || flwError.message);
+
+        await AppDataSource.transaction(async (manager) => {
+          const lockedWallet = await manager.findOne(Wallet, {
+            where: { id: wallet.id },
+            lock: { mode: "pessimistic_write" }
+          });
+          const failedTx = await manager.findOne(Transaction, { where: { id: result.tx.id } });
+
+          if (lockedWallet && failedTx) {
+            lockedWallet.balance = Number(lockedWallet.balance) + amount;
+            lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
+            failedTx.status = TransactionStatus.FAILED;
+            await manager.save([lockedWallet, failedTx]);
+          }
+        });
+
+        return this.responseData(
+          500,
+          true,
+          errorMessage
+        );
+      }
     } catch (error: any) {
       console.error("Withdrawal failed:", error);
       return this.handleTypeormError(error);

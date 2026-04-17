@@ -2,7 +2,7 @@ import { AppDataSource } from "../data-source";
 import { User } from "../entities/User";
 import { Professional } from "../entities/Professional";
 import { Transaction, TransactionStatus } from "../entities/Transaction";
-import { Booking } from "../entities/Booking";
+import { Booking, BookingStatus } from "../entities/Booking";
 import { Admin } from "../entities/Admin";
 import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
 import { PlatformSetting } from "../entities/PlatformSetting";
@@ -10,13 +10,15 @@ import { Dispute, DisputeStatus } from "../entities/Dispute";
 import { Broadcast, BroadcastType } from "../entities/Broadcast";
 import { Review } from "../entities/Review";
 import Service from "./Service";
-import { HttpStatus } from "../types/constants";
+import { HttpStatus, QueueEvents, QueueNames } from "../types/constants";
 import { Like, MoreThanOrEqual, Or } from "typeorm";
 import { ActivityLog } from "../entities/ActivityLog";
 import Password from "../utils/Password";
 import env, { EnvKey } from "../config/env";
 import Cloudinary from "./Cloudinary";
 import { CdnFolders, ResourceType } from "../types/constants";
+import Payment from "./Payment";
+import { RabbitMQ } from "./RabbitMQ";
 
 export default class AdminService extends Service {
     private storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -537,11 +539,25 @@ export default class AdminService extends Service {
             const disputeRepo = AppDataSource.getRepository(Dispute);
             const escrowRepo = AppDataSource.getRepository(Escrow);
 
-            const dispute = await disputeRepo.findOne({ where: { id }, relations: ["transaction", "transaction.escrow"] });
+            const dispute = await disputeRepo.findOne({ 
+                where: { id }, 
+                relations: [
+                    "transaction", 
+                    "transaction.escrow", 
+                    "transaction.escrow.booking", 
+                    "transaction.escrow.booking.professional", 
+                    "transaction.escrow.booking.professional.wallet"
+                ] 
+            });
             if (!dispute) return this.responseData(HttpStatus.NOT_FOUND, true, "Dispute not found");
 
             const escrow = dispute.transaction?.escrow;
             if (!escrow) return this.responseData(HttpStatus.NOT_FOUND, true, "Linked escrow not found");
+
+            const booking = escrow.booking;
+            if (!booking) return this.responseData(HttpStatus.NOT_FOUND, true, "Linked booking not found");
+
+            const paymentService = new Payment();
 
             if (action === "refund_user") {
                 dispute.status = DisputeStatus.WON; // Customer Won
@@ -551,17 +567,35 @@ export default class AdminService extends Service {
                 await disputeRepo.save(dispute);
                 await escrowRepo.save(escrow);
 
-                await this.logActivity(adminId, "DISPUTE_RESOLVED_REFUND", { disputeId: id, action });
-                return this.responseData(HttpStatus.OK, false, "Dispute resolved in favor of customer. Refund pending.");
+                // Trigger actual refund via Flutterwave
+                const refundResult = await paymentService.refundBooking(booking.id, dispute.transaction.userId!);
+                
+                await this.logActivity(adminId, "DISPUTE_RESOLVED_REFUND", { disputeId: id, action, refundResult: refundResult.json });
+                return this.responseData(HttpStatus.OK, false, "Dispute resolved in favor of customer. Refund initiated.", refundResult.json);
+
             } else if (action === "release_to_provider") {
                 dispute.status = DisputeStatus.LOST; // Customer Lost
-                escrow.status = EscrowStatus.RELEASED; // Or PAID
+                escrow.status = EscrowStatus.RELEASED;
+                booking.status = BookingStatus.COMPLETED;
 
                 await disputeRepo.save(dispute);
                 await escrowRepo.save(escrow);
+                await AppDataSource.getRepository(Booking).save(booking);
+
+                // Publish release event for wallet worker
+                const payload = {
+                    escrowId: escrow.id,
+                    professionalId: booking.professionalId,
+                    walletId: booking.professional?.wallet?.id,
+                };
+                
+                await RabbitMQ.publishToExchange(QueueNames.WALLET, QueueEvents.WALLET_ESCROW_RELEASE, {
+                    eventType: QueueEvents.WALLET_ESCROW_RELEASE,
+                    payload,
+                });
 
                 await this.logActivity(adminId, "DISPUTE_RESOLVED_RELEASE", { disputeId: id, action });
-                return this.responseData(HttpStatus.OK, false, "Dispute resolved in favor of provider. Funds releasing.");
+                return this.responseData(HttpStatus.OK, false, "Dispute resolved in favor of provider. Funds released to wallet.");
             } else {
                 return this.responseData(HttpStatus.BAD_REQUEST, true, "Invalid action");
             }
