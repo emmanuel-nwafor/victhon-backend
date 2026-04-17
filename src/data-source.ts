@@ -7,7 +7,7 @@ const envType = env(EnvKey.ENV_TYPE)
 export const AppDataSource = new DataSource({
     type: "mysql",
     url: env(EnvKey.DATABASE_URL)!,
-    synchronize: false,
+    synchronize: true,
     logging: true,
     // logging: process.env.NODE_ENV === 'development' ? true : false,
     entities: [envType == "dev" ? "src/entities/*.ts" : "dist/entities/*.js"],
