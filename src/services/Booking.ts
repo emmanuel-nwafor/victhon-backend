@@ -212,12 +212,16 @@ export default class BookingService extends Service {
         start: Date,
         end: Date,
     ): Promise<boolean> {
-        const startDate = this.toDateOnly(start);
-        const startTime = this.toTimeOnly(start);
-        const endTime = this.toTimeOnly(end);
-        const dayName = start
-            .toLocaleString("en-us", { weekday: "long" })
-            .toLowerCase();
+        // Nigeria is WAT (UTC+1). Shift UTC dates to WAT for comparison with local schedule rules.
+        const watStart = new Date(start.getTime() + 3600000);
+        const watEnd = new Date(end.getTime() + 3600000);
+
+        const startDate = watStart.toISOString().split("T")[0];
+        const startTime = watStart.toISOString().split("T")[1]?.slice(0, 12) || "";
+        const endTime = watEnd.toISOString().split("T")[1]?.slice(0, 12) || "";
+        
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayName = days[watStart.getUTCDay()];
 
         const schedules = await manager.find(ProfessionalSchedule, {
             where: {
@@ -237,11 +241,13 @@ export default class BookingService extends Service {
 
     // --- Helpers ---
     private toDateOnly(date: Date) {
-        return date.toISOString().split("T")[0];
+        const wat = new Date(date.getTime() + 3600000);
+        return wat.toISOString().split("T")[0];
     }
 
     private toTimeOnly(date: Date) {
-        return date.toISOString().split("T")[1]?.slice(0, 12); // 'HH:mm:ss.sss'
+        const wat = new Date(date.getTime() + 3600000);
+        return wat.toISOString().split("T")[1]?.slice(0, 12); // 'HH:mm:ss.sss'
     }
 
     async updateBooking(

@@ -14,6 +14,13 @@ export default class Payment {
         Controller.response(res, serviceResult);
     }
 
+    public static async initializeCommitmentPayment(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { bookingId } = req.params;
+        const serviceResult = await Payment.service.initializeCommitmentPayment(bookingId!, userId);
+        Controller.response(res, serviceResult);
+    }
+
     public static async bookingRefund(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
         const { bookingId } = req.params;

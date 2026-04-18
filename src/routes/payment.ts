@@ -8,6 +8,7 @@ import { initializeValidator, withdrawValidator, setupPinValidator, resolveAccou
 const paymentRouter = Router();
 
 paymentRouter.get('/initialize/booking/:bookingId', initializeValidator, asyncHandler(Controller.initializeBookingPayment));
+paymentRouter.get('/initialize/commitment/:bookingId', initializeValidator, asyncHandler(Controller.initializeCommitmentPayment));
 paymentRouter.get('/initialize/booking/refund/:bookingId', initializeValidator, asyncHandler(Controller.bookingRefund));
 paymentRouter.get('/flw/callback', (req, res) => {
     res.send(`
