@@ -361,6 +361,64 @@ export default class Payment extends BaseService {
     );
   }
 
+  public async verifyCommitmentPayment(bookingId: string) {
+    try {
+      const booking = await this.bookingRepo.findOne({
+        where: { id: bookingId },
+        relations: ["user", "professional"]
+      });
+
+      if (!booking) return this.responseData(404, true, "Booking not found");
+      if (booking.isChatUnlocked) return this.responseData(200, false, "Booking already unlocked", booking);
+
+      // Search for any successful commitment transaction for this booking
+      const tx = await this.transactionRepo.createQueryBuilder("tx")
+        .where("tx.reference LIKE :ref", { ref: `commitment_${bookingId}%` })
+        .andWhere("tx.status = :status", { status: TransactionStatus.SUCCESS })
+        .getOne();
+
+      if (tx) {
+          logger.info(`[MANUAL_VERIFY] Found successful transaction ${tx.id} in DB. Unlocking booking ${bookingId}.`);
+          booking.isChatUnlocked = true;
+          booking.status = BookingStatus.SCHEDULED;
+          await this.bookingRepo.save(booking);
+          
+          await RabbitMQ.publishToExchange(QueueNames.PAYMENT, QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL, {
+              eventType: QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL,
+              payload: {
+                  bookingId: booking.id,
+                  userId: booking.userId,
+                  professionalId: booking.professionalId
+              }
+          });
+          
+          return this.responseData(200, false, "Booking unlocked successfully", booking);
+      }
+
+      // If not in our DB, we check with Flutterwave using the latest pending reference
+      const pendingTx = await this.transactionRepo.createQueryBuilder("tx")
+        .where("tx.reference LIKE :ref", { ref: `commitment_${bookingId}%` })
+        .orderBy("tx.createdAt", "DESC")
+        .getOne();
+
+      if (!pendingTx) return this.responseData(404, true, "No payment records found for this booking");
+
+      const flwResponse = await this.verifyFlwTransaction(pendingTx.reference);
+      
+      if (flwResponse.status === "success") {
+          logger.info(`[MANUAL_VERIFY] Flutterwave confirmed success for ${pendingTx.reference}. Processing...`);
+          await this.successfulCharge(flwResponse);
+          const updatedBooking = await this.bookingRepo.findOne({ where: { id: bookingId } });
+          return this.responseData(200, false, "Booking verified and unlocked", updatedBooking);
+      }
+
+      return this.responseData(400, true, "Payment not yet confirmed by Flutterwave", { flwStatus: flwResponse.status });
+    } catch (error) {
+      logger.error(`[MANUAL_VERIFY] Error verifying commitment for ${bookingId}:`, error);
+      return this.handleTypeormError(error);
+    }
+  }
+
   public async reconcilePendingTransactions() {
     const BATCH_SIZE = 100;
     const TIMEOUT_MS = 30 * 60 * 1000;
@@ -461,12 +519,11 @@ export default class Payment extends BaseService {
       let eventToPublish = null;
 
       await AppDataSource.transaction(async (manager) => {
-        // Try to find the transaction by ID (from metadata) or Reference (tx_ref)
+        // Step 1: Find the transaction without relations first to avoid join errors on null escrows
         let payment = null;
         if (metaTxId) {
             payment = await manager.findOne(Transaction, {
                 where: { id: metaTxId },
-                relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"],
                 lock: { mode: "pessimistic_write" },
             });
         }
@@ -475,9 +532,21 @@ export default class Payment extends BaseService {
             logger.info(`[PAYMENT_WEBHOOK] Falling back to searching by reference: ${txRef}`);
             payment = await manager.findOne(Transaction, {
                 where: { reference: txRef },
-                relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"],
                 lock: { mode: "pessimistic_write" },
             });
+        }
+
+        if (!payment) {
+            logger.error(`Payment not found for metaTxId: ${metaTxId} or txRef: ${txRef}`);
+            throw new Error("Transaction not found");
+        }
+
+        // Step 2: Load specific relations for the transaction type to avoid crashing on null escrows
+        if (payment.type === TransactionType.BOOKING_DEPOSIT) {
+            payment = await manager.findOne(Transaction, {
+                where: { id: payment.id },
+                relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"]
+            }) || payment;
         }
 
         if (!payment) {

@@ -35,6 +35,7 @@ paymentRouter.get('/flw/callback', (req, res) => {
     `);
 });
 paymentRouter.get('/verify/:reference', verifyJWT([UserType.USER]), asyncHandler(Controller.verifyFlwTransaction));
+paymentRouter.get('/verify/commitment/:bookingId', verifyJWT([UserType.USER, UserType.PROFESSIONAL]), asyncHandler(Controller.verifyCommitment));
 paymentRouter.post('/withdraw', withdrawValidator, asyncHandler(Controller.withdraw));
 
 paymentRouter.get('/banks', asyncHandler(Controller.getBanks));

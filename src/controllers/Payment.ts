@@ -34,6 +34,12 @@ export default class Payment {
         Controller.response(res, serviceResult);
     }
 
+    public static async verifyCommitment(req: Request, res: Response) {
+        const { bookingId } = req.params;
+        const serviceResult = await Payment.service.verifyCommitmentPayment(bookingId!);
+        Controller.response(res, serviceResult);
+    }
+
     public static async getBanks(req: Request, res: Response) {
         const serviceResult = await Payment.service.getBanks();
         Controller.response(res, serviceResult);

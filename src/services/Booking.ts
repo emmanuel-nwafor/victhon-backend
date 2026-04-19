@@ -400,6 +400,10 @@ export default class BookingService extends Service {
             if (!booking)
                 return this.responseData(404, true, "Booking was not found");
 
+            if (booking.status !== BookingStatus.PENDING) {
+                return this.responseData(400, true, `This booking is already ${booking.status.replace('_', ' ')}.`);
+            }
+
             // Check if professional profile is complete
             const isProfileComplete = await this.isProfileComplete(proId);
             if (!isProfileComplete) {

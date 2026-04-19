@@ -11,6 +11,7 @@ import Cloudinary from "./Cloudinary";
 import { FailedFiles, UploadedFiles } from "../types";
 import MessageAttachment from "../entities/MessageAttachment";
 import { RabbitMQ } from "./RabbitMQ";
+import { Booking, BookingStatus } from "../entities/Booking";
 
 
 class TransactionError extends Error {
@@ -186,6 +187,21 @@ export default class Chat extends Service {
 
                 const user = await manager.findOne(User, { where: { id: userId } });
                 if (!user) throw new TransactionError("User not found");
+
+                // --- NEW RESTRICTION ---
+                // Check if there is at least one booking between them that is unlocked
+                const unlockedBooking = await manager.findOne(Booking, {
+                    where: {
+                        userId,
+                        professionalId,
+                        isChatUnlocked: true
+                    }
+                });
+
+                if (!unlockedBooking) {
+                    throw new TransactionError("Chat is locked. Please pay the commitment fee for your booking to unlock chat.");
+                }
+                // -----------------------
                 // const chatExists = await manager.findOne(ChatParticipant, {
                 //     where: [
                 //         {
