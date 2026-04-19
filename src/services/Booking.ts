@@ -406,10 +406,7 @@ export default class BookingService extends Service {
                 return this.responseData(HttpStatus.FORBIDDEN, true, "Professional has not completed their business profile setup.");
             }
 
-            if (booking.status !== BookingStatus.PENDING)
-                return this.responseData(400, true, `This booking can't be accepted`);
-
-            booking.status = BookingStatus.ACCEPTED;
+            booking.status = BookingStatus.AWAITING_COMMITMENT;
             const updatedBooking = await this.repo.save(booking);
 
             // Non-blocking notification

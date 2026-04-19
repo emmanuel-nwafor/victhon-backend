@@ -572,23 +572,30 @@ export default class Payment extends BaseService {
 
             if (booking) {
                 logger.info(`[PAYMENT_WEBHOOK] Found booking: ${booking.id}, status: ${booking.status}, chatUnlocked: ${booking.isChatUnlocked}`);
+                
+                // Transition to SCHEDULED regardless of current state if commitment paid
                 if (!booking.isChatUnlocked) {
-                    booking.isChatUnlocked = true;
-                    booking.status = BookingStatus.SCHEDULED;
-                    await manager.save(booking);
-                    logger.info(`[PAYMENT_WEBHOOK] Updated booking to SCHEDULED and unlocked chat.`);
+                    try {
+                        booking.isChatUnlocked = true;
+                        booking.status = BookingStatus.SCHEDULED;
+                        await manager.save(booking);
+                        logger.info(`[PAYMENT_WEBHOOK] Successfully updated booking ${booking.id} to SCHEDULED`);
 
-                    eventToPublish = {
-                        queueName: QueueNames.PAYMENT,
-                        eventType: QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL,
-                        payload: {
-                            bookingId: booking.id,
-                            userId: booking.userId,
-                            professionalId: booking.professionalId
-                        }
-                    };
+                        eventToPublish = {
+                            queueName: QueueNames.PAYMENT,
+                            eventType: QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL,
+                            payload: {
+                                bookingId: booking.id,
+                                userId: booking.userId,
+                                professionalId: booking.professionalId
+                            }
+                        };
+                    } catch (saveErr: any) {
+                        logger.error(`[PAYMENT_WEBHOOK] Failed to save booking ${bookingId}: ${saveErr.message}`);
+                        throw saveErr; // Rollback transaction
+                    }
                 } else {
-                    logger.info(`[PAYMENT_WEBHOOK] Chat was already unlocked for booking ${booking.id}`);
+                    logger.info(`[PAYMENT_WEBHOOK] Chat already unlocked for booking ${booking.id}`);
                 }
             } else {
                 logger.error(`[PAYMENT_WEBHOOK] Booking ${bookingId} not found for commitment fee`);
@@ -915,8 +922,13 @@ export default class Payment extends BaseService {
   }
 
   public async webhook(payload: any, signature: any) {
-    // Plain string comparison — NOT an HMAC hash
+    const signatureStr = String(signature || "");
+    const expectedHash = String(this.FLW_SECRET_HASH || "");
+    
+    logger.info(`[PAYMENT_WEBHOOK] Verifying signature. Received: ${signatureStr.substring(0, 5)}..., Expected matches: ${signatureStr === expectedHash}`);
+
     if (!signature || signature !== this.FLW_SECRET_HASH) {
+      logger.error(`[PAYMENT_WEBHOOK] Unauthorized. Received Signature does not match FLW_SECRET_HASH.`);
       return this.responseData(401, true, "Invalid signature");
     }
 
