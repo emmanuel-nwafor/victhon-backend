@@ -27,6 +27,7 @@ export enum BookingStatus {
     DISPUTED = "disputed",
     ON_THE_WAY = "on_the_way",
     AWAITING_COMMITMENT = "awaiting_commitment",
+    SCHEDULED = "scheduled",
     CHATTING = "chatting"
 }
 

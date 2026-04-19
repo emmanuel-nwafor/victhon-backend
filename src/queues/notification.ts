@@ -27,6 +27,13 @@ console.log('Notification queue worker ready');
 
 
 function getNotificationContent(type: NotificationType, data: any) {
+    if (data?.message || data?.body) {
+        return { 
+            title: data?.title || "Victhon Update", 
+            body: data?.message || data?.body 
+        };
+    }
+
     switch (type) {
         case NotificationType.BOOKING:
             return { title: "New Booking", body: "You have a new booking request!" };

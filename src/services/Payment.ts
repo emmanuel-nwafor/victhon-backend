@@ -8,6 +8,7 @@ import { Booking, BookingStatus } from "../entities/Booking";
 import { Dispute } from "../entities/Dispute";
 import { Escrow, EscrowStatus, RefundStatus } from "../entities/Escrow";
 import { NotificationType } from "../entities/Notification";
+import { PlatformSetting } from "../entities/PlatformSetting";
 import { Professional } from "../entities/Professional";
 import {
   Transaction,
@@ -34,6 +35,7 @@ export default class Payment extends BaseService {
   private readonly disputeRepo = AppDataSource.getRepository(Dispute);
   private readonly proRepo = AppDataSource.getRepository(Professional);
   private readonly accountRepo = AppDataSource.getRepository(Account);
+  private readonly platformSettingsRepo = AppDataSource.getRepository(PlatformSetting);
 
   private readonly FLW_SECRET_KEY = env(EnvKey.FLW_SECRET_KEY)!;
 
@@ -507,8 +509,19 @@ export default class Payment extends BaseService {
 
           if (!wallet) throw new Error("Wallet not found");
 
+          const settings = await manager.findOne(PlatformSetting, { where: {} });
+          let netAmount = Number(escrow.amount);
+          
+          if (settings) {
+            const feePercent = Number(settings.platformFeePercentage || 0);
+            const fixedFee = Number(settings.fixedFee || 0);
+            const deduction = (netAmount * feePercent / 100) + fixedFee;
+            netAmount = Math.max(0, netAmount - deduction);
+            logger.info(`Deducted platform fee: ${deduction} (Net: ${netAmount})`);
+          }
+
           const newPendingAmount =
-            Number(wallet.pendingAmount) + Number(escrow.amount);
+            Number(wallet.pendingAmount) + netAmount;
           const newTotalBalance = Number(wallet.balance) + newPendingAmount;
 
           await manager.update(
@@ -542,7 +555,7 @@ export default class Payment extends BaseService {
 
             if (booking && !booking.isChatUnlocked) {
                 booking.isChatUnlocked = true;
-                booking.status = BookingStatus.CHATTING;
+                booking.status = BookingStatus.SCHEDULED;
                 await manager.save(booking);
 
                 // Initialize Chat using ChatService (import correctly if needed or generic creation)
