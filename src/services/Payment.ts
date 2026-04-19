@@ -448,40 +448,53 @@ export default class Payment extends BaseService {
 
   public async successfulCharge(eventData: any) {
     try {
-      const { transactionId } = eventData.metadata ?? eventData.meta ?? {};
+      const { transactionId: metaTxId } = eventData.metadata ?? eventData.meta ?? {};
+      const txRef = eventData.tx_ref || eventData.reference;
+      
+      logger.info(`[PAYMENT_WEBHOOK] Received webhook. metaTxId: ${metaTxId}, txRef: ${txRef}`);
 
-      if (!transactionId) {
-        logger.error("No transactionId in webhook metadata");
+      if (!metaTxId && !txRef) {
+        logger.error("No transactionId or tx_ref in webhook data");
         return;
       }
 
       let eventToPublish = null;
 
       await AppDataSource.transaction(async (manager) => {
-        const payment = await manager.findOne(Transaction, {
-          where: { id: transactionId },
-          relations: [
-            "escrow",
-            "escrow.booking",
-            "escrow.booking.professional",
-            "escrow.booking.professional.wallet",
-          ],
-          lock: { mode: "pessimistic_write" },
-        });
-
-        if (!payment) {
-          logger.error(`Payment not found for transactionId: ${transactionId}`);
-          throw new Error("Transaction not found");
+        // Try to find the transaction by ID (from metadata) or Reference (tx_ref)
+        let payment = null;
+        if (metaTxId) {
+            payment = await manager.findOne(Transaction, {
+                where: { id: metaTxId },
+                relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"],
+                lock: { mode: "pessimistic_write" },
+            });
+        }
+        
+        if (!payment && txRef) {
+            logger.info(`[PAYMENT_WEBHOOK] Falling back to searching by reference: ${txRef}`);
+            payment = await manager.findOne(Transaction, {
+                where: { reference: txRef },
+                relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"],
+                lock: { mode: "pessimistic_write" },
+            });
         }
 
+        if (!payment) {
+          logger.error(`Payment not found for metaTxId: ${metaTxId} or txRef: ${txRef}`);
+          throw new Error("Transaction not found");
+        }
+        
+        const finalTxId = payment.id;
+
         if (payment.status === TransactionStatus.SUCCESS) {
-          logger.info(`Payment already processed: ${transactionId}`);
+          logger.info(`Payment already processed: ${finalTxId}`);
           return;
         }
 
         await manager.update(
           Transaction,
-          { id: transactionId },
+          { id: finalTxId },
           { status: TransactionStatus.SUCCESS },
         );
 
@@ -491,7 +504,7 @@ export default class Payment extends BaseService {
 
           if (escrow.status === EscrowStatus.PAID) {
             logger.info(
-              `Escrow already PAID for transaction: ${transactionId}`,
+              `Escrow already PAID for transaction: ${finalTxId}`,
             );
             return;
           }
@@ -537,12 +550,16 @@ export default class Payment extends BaseService {
             queueName: QueueNames.PAYMENT,
             eventType: QueueEvents.PAYMENT_BOOK_SUCCESSFUL,
             payload: {
-              transactionId,
+              transactionId: finalTxId,
               professionalId: escrow.booking.professionalId,
             },
           };
         } else if (payment.type === TransactionType.COMMITMENT_FEE) {
-            const bookingId = payment.reference?.split('_')[1]; 
+            // Robust bookingId extraction
+            const bookingId = eventData.metadata?.bookingId || payment.reference?.split('_')[1];
+            
+            logger.info(`[PAYMENT_WEBHOOK] Processing Commitment Fee for booking: ${bookingId}`);
+
             if (!bookingId) {
                 logger.error(`Invalid commitment fee reference: ${payment.reference}`);
                 throw new Error("Invalid commitment fee reference");
@@ -553,27 +570,33 @@ export default class Payment extends BaseService {
                 relations: ["user", "professional"]
             });
 
-            if (booking && !booking.isChatUnlocked) {
-                booking.isChatUnlocked = true;
-                booking.status = BookingStatus.SCHEDULED;
-                await manager.save(booking);
+            if (booking) {
+                logger.info(`[PAYMENT_WEBHOOK] Found booking: ${booking.id}, status: ${booking.status}, chatUnlocked: ${booking.isChatUnlocked}`);
+                if (!booking.isChatUnlocked) {
+                    booking.isChatUnlocked = true;
+                    booking.status = BookingStatus.SCHEDULED;
+                    await manager.save(booking);
+                    logger.info(`[PAYMENT_WEBHOOK] Updated booking to SCHEDULED and unlocked chat.`);
 
-                // Initialize Chat using ChatService (import correctly if needed or generic creation)
-                // For now, we'll use a direct chat creation logic or a queue event
-                eventToPublish = {
-                    queueName: QueueNames.PAYMENT,
-                    eventType: QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL,
-                    payload: {
-                        bookingId: booking.id,
-                        userId: booking.userId,
-                        professionalId: booking.professionalId
-                    }
-                };
+                    eventToPublish = {
+                        queueName: QueueNames.PAYMENT,
+                        eventType: QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL,
+                        payload: {
+                            bookingId: booking.id,
+                            userId: booking.userId,
+                            professionalId: booking.professionalId
+                        }
+                    };
+                } else {
+                    logger.info(`[PAYMENT_WEBHOOK] Chat was already unlocked for booking ${booking.id}`);
+                }
+            } else {
+                logger.error(`[PAYMENT_WEBHOOK] Booking ${bookingId} not found for commitment fee`);
             }
         }
 
         logger.info(
-          `🤑 Payment successfully processed for transaction: ${transactionId}`,
+          `🤑 Payment successfully processed for transaction: ${finalTxId}`,
         );
       });
 

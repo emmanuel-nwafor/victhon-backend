@@ -488,7 +488,7 @@ export default class BookingService extends Service {
             }
 
             if (
-                ![BookingStatus.ACCEPTED, BookingStatus.REVIEW, BookingStatus.ON_THE_WAY].includes(booking.status as any)
+                ![BookingStatus.ACCEPTED, BookingStatus.REVIEW, BookingStatus.ON_THE_WAY, BookingStatus.SCHEDULED].includes(booking.status as any)
             ) {
                 return this.responseData(
                     400,
@@ -543,8 +543,8 @@ export default class BookingService extends Service {
             if (!booking)
                 return this.responseData(404, true, "Booking was not found");
 
-            if (booking.status !== BookingStatus.ACCEPTED)
-                return this.responseData(400, true, "Booking must be accepted first.");
+            if (booking.status !== BookingStatus.ACCEPTED && booking.status !== BookingStatus.SCHEDULED)
+                return this.responseData(400, true, "Booking must be accepted or scheduled first.");
 
             if (booking.escrow.status !== EscrowStatus.PAID)
                 return this.responseData(400, true, "You can only start moving after the customer has paid for the booking.");
@@ -773,7 +773,7 @@ export default class BookingService extends Service {
                 return this.responseData(HttpStatus.NOT_FOUND, true, "Booking not found");
             }
 
-            if (booking.status !== BookingStatus.REVIEW && booking.status !== BookingStatus.ACCEPTED && booking.status !== BookingStatus.ON_THE_WAY) {
+            if (booking.status !== BookingStatus.REVIEW && booking.status !== BookingStatus.ACCEPTED && booking.status !== BookingStatus.ON_THE_WAY && booking.status !== BookingStatus.SCHEDULED) {
                 return this.responseData(HttpStatus.BAD_REQUEST, true, "Booking cannot be disputed at this stage");
             }
 
