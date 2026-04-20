@@ -499,15 +499,14 @@ export default class BookingService extends Service {
                 }
 
                 const activeStates = [
-                    BookingStatus.ACCEPTED,
-                    BookingStatus.SCHEDULED,
                     BookingStatus.ON_THE_WAY,
+                    BookingStatus.SCHEDULED,
                     BookingStatus.COMPLETED,
                     BookingStatus.REVIEW
                 ];
 
                 if (!activeStates.includes(booking.status)) {
-                    throw new Error(`Review cannot be submitted at this stage (Current status: ${booking.status}).`);
+                    throw new Error(`You must start the trip or service before you can finalize it (Current status: ${booking.status}).`);
                 }
 
                 if (booking.isProfessionalCompleted) {
