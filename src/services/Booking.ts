@@ -418,7 +418,7 @@ export default class BookingService extends Service {
                 return this.responseData(HttpStatus.FORBIDDEN, true, "Professional has not completed their business profile setup.");
             }
 
-            booking.status = BookingStatus.AWAITING_COMMITMENT;
+            booking.status = BookingStatus.ACCEPTED;
             const updatedBooking = await this.repo.save(booking);
 
             // Non-blocking notification

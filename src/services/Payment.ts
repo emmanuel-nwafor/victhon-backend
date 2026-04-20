@@ -380,7 +380,7 @@ export default class Payment extends BaseService {
       if (tx) {
           logger.info(`[MANUAL_VERIFY] Found successful transaction ${tx.id} in DB. Unlocking booking ${bookingId}.`);
           booking.isChatUnlocked = true;
-          booking.status = BookingStatus.SCHEDULED;
+          booking.status = BookingStatus.PENDING;
           await this.bookingRepo.save(booking);
           
           await RabbitMQ.publishToExchange(QueueNames.PAYMENT, QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL, {
@@ -582,6 +582,12 @@ export default class Payment extends BaseService {
             Escrow,
             { id: escrow.id },
             { status: EscrowStatus.PAID },
+          );
+
+          await manager.update(
+            Booking,
+            { id: escrow.booking.id },
+            { status: BookingStatus.SCHEDULED },
           );
 
           const wallet = await manager.findOne(Wallet, {

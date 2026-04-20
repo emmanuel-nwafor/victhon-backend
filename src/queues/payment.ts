@@ -116,7 +116,7 @@ payment.route(QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL, async (message: any, io
 
         // Emit status update via socket to the booking room
         io.of(Namespaces.BASE).to(`booking_${bookingId}`).emit("status-updated", {
-            status: BookingStatus.SCHEDULED
+            status: BookingStatus.PENDING
         });
 
         logger.info(`💬 Chat unlocked, status emitted, and professional notified for booking:${bookingId}`);
