@@ -178,15 +178,7 @@ export default class BookingService extends Service {
                 return await manager.save(booking);
             });
 
-            // Non-blocking notification
-            notify({
-                userId: professionalId,
-                userType: UserType.PROFESSIONAL,
-                type: NotificationType.BOOKING,
-                data: data,
-            }).catch(notifyError => {
-                console.error("[BOOKING_FLOW] Failed to queue booking notification:", notifyError);
-            });
+
 
             return this.responseData(
                 201,
@@ -338,8 +330,18 @@ export default class BookingService extends Service {
                     .replace("POINT(", "")
                     .replace(")", "")
                     .split(" ");
-                (booking.professional as any).longitude = parseFloat(coords[0] || "0");
-                (booking.professional as any).latitude = parseFloat(coords[1] || "0");
+
+                if (!booking.isChatUnlocked) {
+                    (booking.professional as any).longitude = 0;
+                    (booking.professional as any).latitude = 0;
+                } else {
+                    (booking.professional as any).longitude = parseFloat(coords[0] || "0");
+                    (booking.professional as any).latitude = parseFloat(coords[1] || "0");
+                }
+            }
+
+            if (!booking.isChatUnlocked) {
+                booking.address = "Hidden until commitment fee is paid";
             }
 
             return this.responseData(
@@ -372,8 +374,14 @@ export default class BookingService extends Service {
                     .replace("POINT(", "")
                     .replace(")", "")
                     .split(" ");
-                (booking.professional as any).longitude = parseFloat(coords[0] || "0");
-                (booking.professional as any).latitude = parseFloat(coords[1] || "0");
+
+                if (!booking.isChatUnlocked) {
+                    (booking.professional as any).longitude = 0;
+                    (booking.professional as any).latitude = 0;
+                } else {
+                    (booking.professional as any).longitude = parseFloat(coords[0] || "0");
+                    (booking.professional as any).latitude = parseFloat(coords[1] || "0");
+                }
             }
 
             return this.responseData(

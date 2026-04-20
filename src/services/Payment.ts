@@ -591,19 +591,8 @@ export default class Payment extends BaseService {
 
           if (!wallet) throw new Error("Wallet not found");
 
-          const settings = await manager.findOne(PlatformSetting, { where: {} });
-          let netAmount = Number(escrow.amount);
-          
-          if (settings) {
-            const feePercent = Number(settings.platformFeePercentage || 0);
-            const fixedFee = Number(settings.fixedFee || 0);
-            const deduction = (netAmount * feePercent / 100) + fixedFee;
-            netAmount = Math.max(0, netAmount - deduction);
-            logger.info(`Deducted platform fee: ${deduction} (Net: ${netAmount})`);
-          }
-
-          const newPendingAmount =
-            Number(wallet.pendingAmount) + netAmount;
+          const grossAmount = Number(escrow.amount);
+          const newPendingAmount = Number(wallet.pendingAmount) + grossAmount;
           const newTotalBalance = Number(wallet.balance) + newPendingAmount;
 
           await manager.update(
@@ -646,9 +635,17 @@ export default class Payment extends BaseService {
                 if (!booking.isChatUnlocked) {
                     try {
                         booking.isChatUnlocked = true;
-                        booking.status = BookingStatus.SCHEDULED;
+                        booking.status = BookingStatus.PENDING;
                         await manager.save(booking);
-                        logger.info(`[PAYMENT_WEBHOOK] Successfully updated booking ${booking.id} to SCHEDULED`);
+                        logger.info(`[PAYMENT_WEBHOOK] Successfully updated booking ${booking.id} to PENDING and unlocked chat`);
+
+                        // --- ALERT PROFESSIONAL NOW ---
+                        notify({
+                            userId: booking.professionalId,
+                            userType: UserType.PROFESSIONAL,
+                            type: NotificationType.BOOKING,
+                            data: { ...booking, professional: undefined },
+                        }).catch(err => logger.error(`[PAYMENT_WEBHOOK] Notification error: ${err.message}`));
 
                         eventToPublish = {
                             queueName: QueueNames.PAYMENT,
