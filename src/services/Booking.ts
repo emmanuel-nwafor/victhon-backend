@@ -497,12 +497,12 @@ export default class BookingService extends Service {
             }
 
             if (
-                ![BookingStatus.ACCEPTED, BookingStatus.REVIEW, BookingStatus.ON_THE_WAY, BookingStatus.SCHEDULED].includes(booking.status as any)
+                ![BookingStatus.COMPLETED, BookingStatus.REVIEW].includes(booking.status as any)
             ) {
                 return this.responseData(
                     400,
                     true,
-                    `This booking can't be put for review (Current status: ${booking.status})`,
+                    `Reviews can only be given after the customer has finalized the booking (Current status: ${booking.status})`,
                 );
             }
 
@@ -555,8 +555,6 @@ export default class BookingService extends Service {
             if (booking.status !== BookingStatus.ACCEPTED && booking.status !== BookingStatus.SCHEDULED)
                 return this.responseData(400, true, "Booking must be accepted or scheduled first.");
 
-            if (booking.escrow.status !== EscrowStatus.PAID)
-                return this.responseData(400, true, "You can only start moving after the customer has paid for the booking.");
 
             const hasOnsite = booking.services.some(s => s.onsiteLocationService);
             if (!hasOnsite)
@@ -625,9 +623,9 @@ export default class BookingService extends Service {
                     throw new Error("Booking not found");
                 }
 
-                // enforce multi-step: must be in REVIEW to complete
-                if (booking.status !== BookingStatus.REVIEW) {
-                    throw new Error(`Booking cannot be completed yet. The professional must first mark the service as 'Ready for Review' before you can finalize it.`);
+                const allowedStatuses = [BookingStatus.ACCEPTED, BookingStatus.SCHEDULED, BookingStatus.ON_THE_WAY, BookingStatus.REVIEW];
+                if (!allowedStatuses.includes(booking.status)) {
+                    throw new Error(`Booking cannot be completed at this stage (Current status: ${booking.status}).`);
                 }
 
                 if (booking.escrow.status !== EscrowStatus.PAID) {
