@@ -484,51 +484,79 @@ export default class BookingService extends Service {
 
     public async reviewBooking(bookingId: string, proId: string) {
         try {
-            const booking = await this.repo.findOne({
-                where: {
-                    id: bookingId,
-                    professionalId: proId,
-                },
-                relations: ["professional", "user"],
+            const result = await AppDataSource.transaction(async (manager) => {
+                const booking = await manager.findOne(Booking, {
+                    where: { id: bookingId, professionalId: proId },
+                    relations: {
+                        escrow: true,
+                        professional: { wallet: true },
+                    },
+                    lock: { mode: "pessimistic_write" },
+                });
+
+                if (!booking) {
+                    throw new Error("Booking not found");
+                }
+
+                const activeStates = [
+                    BookingStatus.ACCEPTED,
+                    BookingStatus.SCHEDULED,
+                    BookingStatus.ON_THE_WAY,
+                    BookingStatus.COMPLETED,
+                    BookingStatus.REVIEW
+                ];
+
+                if (!activeStates.includes(booking.status)) {
+                    throw new Error(`Review cannot be submitted at this stage (Current status: ${booking.status}).`);
+                }
+
+                if (booking.isProfessionalCompleted) {
+                    return booking;
+                }
+
+                booking.isProfessionalCompleted = true;
+
+                // Check if both confirmed - If so, finalize and release funds
+                if (booking.isCustomerCompleted && booking.escrow.status === EscrowStatus.PAID) {
+                    booking.status = BookingStatus.COMPLETED;
+                    booking.escrow.status = EscrowStatus.RELEASED;
+                    
+                    await manager.save(booking);
+
+                    // Trigger fund release
+                    const payload = {
+                        escrowId: booking.escrow.id,
+                        professionalId: booking.professionalId,
+                        walletId: booking.professional.wallet.id,
+                    };
+                    await RabbitMQ.publishToExchange(QueueNames.WALLET, QueueEvents.WALLET_ESCROW_RELEASE, {
+                        eventType: QueueEvents.WALLET_ESCROW_RELEASE,
+                        payload,
+                    });
+
+                    // notify participants of completion
+                    notify({
+                        userId: booking.userId,
+                        userType: UserType.USER,
+                        type: NotificationType.COMPLETED,
+                        data: { ...booking, professional: undefined, escrow: undefined }
+                    }).catch(err => console.error("Failed to notify customer of completion:", err));
+                } else {
+                    // Just move to REVIEW if not already completed/completed by other
+                    if (booking.status !== BookingStatus.COMPLETED) {
+                        booking.status = BookingStatus.REVIEW;
+                    }
+                    await manager.save(booking);
+                }
+
+                return booking;
             });
-
-            if (!booking) {
-                return this.responseData(404, true, "Booking was not found");
-            }
-
-            if (
-                ![BookingStatus.COMPLETED, BookingStatus.REVIEW].includes(booking.status as any)
-            ) {
-                return this.responseData(
-                    400,
-                    true,
-                    `Reviews can only be given after the customer has finalized the booking (Current status: ${booking.status})`,
-                );
-            }
-
-            if (booking.status === BookingStatus.REVIEW) {
-                return this.responseData(200, false, "Booking is already in review", { ...booking, professional: undefined });
-            }
-
-            booking.status = BookingStatus.REVIEW;
-            const updatedBooking = await this.repo.save(booking);
-
-            // notify user of review status
-            notify({
-                userId: booking.userId,
-                userType: UserType.USER,
-                type: NotificationType.REVIEW_BOOKING,
-                data: { ...updatedBooking, user: undefined },
-            }).catch(err => console.error("Failed to queue review notification:", err));
 
             return this.responseData(
                 200,
                 false,
-                "Booking has been updated successfully",
-                {
-                    ...updatedBooking,
-                    professional: undefined,
-                },
+                "Professional confirmation recorded successfully",
+                { ...result, professional: undefined }
             );
         } catch (error) {
             return this.handleTypeormError(error);
@@ -623,56 +651,64 @@ export default class BookingService extends Service {
                     throw new Error("Booking not found");
                 }
 
-                const allowedStatuses = [BookingStatus.ACCEPTED, BookingStatus.SCHEDULED, BookingStatus.ON_THE_WAY, BookingStatus.REVIEW];
+                const allowedStatuses = [BookingStatus.ACCEPTED, BookingStatus.SCHEDULED, BookingStatus.ON_THE_WAY, BookingStatus.REVIEW, BookingStatus.COMPLETED];
                 if (!allowedStatuses.includes(booking.status)) {
                     throw new Error(`Booking cannot be completed at this stage (Current status: ${booking.status}).`);
                 }
 
-                if (booking.escrow.status !== EscrowStatus.PAID) {
-                    throw new Error("Booking cannot be completed yet because payment has not been confirmed in escrow. Please ensure payment is successful.");
+                if (booking.isCustomerCompleted) {
+                    return booking;
                 }
 
-                if (booking.escrow.refundStatus !== RefundStatus.NONE) {
-                    throw new Error(`Booking cannot be completed because a refund is in state: ${booking.escrow.refundStatus}`);
+                booking.isCustomerCompleted = true;
+
+                // Check if both confirmed - If so, finalize and release funds
+                if (booking.isProfessionalCompleted && booking.escrow.status === EscrowStatus.PAID) {
+                    booking.status = BookingStatus.COMPLETED;
+                    booking.escrow.status = EscrowStatus.RELEASED;
+                    
+                    await manager.save(booking);
+
+                    // Trigger fund release
+                    const payload = {
+                        escrowId: booking.escrow.id,
+                        professionalId: booking.professionalId,
+                        walletId: booking.professional.wallet.id,
+                    };
+                    await RabbitMQ.publishToExchange(QueueNames.WALLET, QueueEvents.WALLET_ESCROW_RELEASE, {
+                        eventType: QueueEvents.WALLET_ESCROW_RELEASE,
+                        payload,
+                    });
+
+                    // notify participants of completion
+                    notify({
+                        userId: booking.userId,
+                        userType: UserType.USER,
+                        type: NotificationType.COMPLETED,
+                        data: { ...booking, professional: undefined, escrow: undefined }
+                    }).catch(err => console.error("Failed to notify customer of completion:", err));
+
+                    notify({
+                        userId: booking.professionalId,
+                        userType: UserType.PROFESSIONAL,
+                        type: NotificationType.COMPLETED,
+                        data: { ...booking, professional: undefined, escrow: undefined }
+                    }).catch(err => console.error("Failed to notify professional of completion:", err));
+                } else {
+                    // Update status to REVIEW to signal confirmation is in progress
+                    if (booking.status !== BookingStatus.COMPLETED) {
+                        booking.status = BookingStatus.REVIEW;
+                    }
+                    await manager.save(booking);
                 }
 
-                booking.status = BookingStatus.COMPLETED;
-                booking.escrow.status = EscrowStatus.RELEASED;
-
-                return await manager.save(booking);
+                return booking;
             });
-
-            const payload = {
-                escrowId: result.escrow.id,
-                professionalId: result.professionalId,
-                walletId: result.professional.wallet.id,
-            };
-            const queueName = QueueNames.WALLET;
-            const eventType = QueueEvents.WALLET_ESCROW_RELEASE;
-            await RabbitMQ.publishToExchange(queueName, eventType, {
-                eventType: eventType,
-                payload,
-            });
-
-            // notify participants of completion
-            notify({
-                userId: result.userId,
-                userType: UserType.USER,
-                type: NotificationType.COMPLETED,
-                data: { ...result, professional: undefined, escrow: undefined }
-            }).catch(err => console.error("Failed to notify customer of completion:", err));
-
-            notify({
-                userId: result.professionalId,
-                userType: UserType.PROFESSIONAL,
-                type: NotificationType.COMPLETED,
-                data: { ...result, professional: undefined, escrow: undefined }
-            }).catch(err => console.error("Failed to notify professional of completion:", err));
 
             return this.responseData(
                 200,
                 false,
-                "Booking completed successfully",
+                "Customer confirmation recorded successfully",
                 result,
             );
         } catch (error) {

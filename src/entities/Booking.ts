@@ -94,6 +94,12 @@ export class Booking {
     commitmentFee: number;
 
     @Column({ default: false })
+    isCustomerCompleted: boolean;
+
+    @Column({ default: false })
+    isProfessionalCompleted: boolean;
+
+    @Column({ default: false })
     isChatUnlocked: boolean;
 
     @Column({ type: 'text', nullable: true })
