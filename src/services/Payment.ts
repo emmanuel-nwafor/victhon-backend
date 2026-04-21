@@ -153,10 +153,8 @@ export default class Payment extends BaseService {
 
       const tx_ref = `booking_${booking.id}_${Date.now()}`;
 
-      // Calculate balance to pay
-      const amountToPay = booking.isChatUnlocked 
-        ? Number(booking.amount) - Number(booking.commitmentFee)
-        : Number(booking.amount);
+      // Calculate balance to pay - Fixed: commitment fee is now additional, not subtracted
+      const amountToPay = Number(booking.amount);
 
       const transaction = this.transactionRepo.create({
         userId,
