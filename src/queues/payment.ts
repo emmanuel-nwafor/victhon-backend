@@ -69,19 +69,19 @@ payment.route(QueueEvents.PAYMENT_BOOK_SUCCESSFUL, async (message: any, io: Serv
                     detailedBooking.user.firstName,
                     detailedBooking
                 );
+
+                const customerName = `${detailedBooking?.user?.firstName} ${detailedBooking?.user?.lastName}`.trim();
+                await notify({
+                    userId: professionalId,
+                    userType: UserType.PROFESSIONAL,
+                    type: NotificationType.BOOKING_PAYMENT,
+                    data: { 
+                        ...result,
+                        body: `${customerName} has paid for the booking`
+                    }
+                });
             }
         }
-
-        const customerName = `${detailedBooking?.user?.firstName} ${detailedBooking?.user?.lastName}`.trim();
-        await notify({
-            userId: professionalId,
-            userType: UserType.PROFESSIONAL,
-            type: NotificationType.BOOKING_PAYMENT,
-            data: {
-                ...result,
-                body: `${customerName} has paid for the booking`
-            }
-        });
 
         // Emit status update via socket to the booking room
         if (result?.escrow?.booking?.id) {
