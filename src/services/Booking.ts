@@ -150,7 +150,7 @@ export default class BookingService extends Service {
                 // Fetch platform settings for commitment fee
                 const settingsRepo = manager.getRepository(PlatformSetting);
                 const settings = await settingsRepo.findOne({ where: {} });
-                const commitmentFee = Number(settings?.commitmentFee || 2000);
+                const commitmentFee = settings ? Number(settings.commitmentFee) : 2000;
 
                 // --- Step 4: Create booking ---
                 const booking = manager.create(Booking, {

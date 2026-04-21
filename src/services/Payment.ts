@@ -63,7 +63,16 @@ export default class Payment extends BaseService {
       if (!booking) return this.responseData(404, true, "Booking not found");
       if (booking.isChatUnlocked) return this.responseData(400, true, "Chat is already unlocked for this booking");
 
-      const amount = Number(booking.commitmentFee);
+      const settings = await this.platformSettingsRepo.findOne({ where: {} });
+      const currentFee = Number(settings?.commitmentFee || 2000);
+
+      // If the fee in the booking is different from the current platform fee, update it
+      if (Number(booking.commitmentFee) !== currentFee) {
+        booking.commitmentFee = currentFee;
+        await this.bookingRepo.save(booking);
+      }
+
+      const amount = currentFee;
       if (amount <= 0) return this.responseData(400, true, "Invalid commitment fee amount");
 
       const tx_ref = `commitment_${booking.id}_${Date.now()}`;
