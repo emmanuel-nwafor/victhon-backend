@@ -41,9 +41,14 @@ export class CreateActivityLogTable1775943480355 implements MigrationInterface {
         
         await queryRunner.query(`ALTER TABLE \`notifications\` CHANGE \`type\` \`type\` enum ('system', 'booking', 'acceptedBooking', 'rejectedBooking', 'viewProfile', 'bookingPayment', 'escrow_release', 'review_booking', 'cancelBooking', 'refundBooking', 'refundFailed', 'disputed', 'new_review', 'chat', 'on_the_way', 'completed', 'welcome') NOT NULL DEFAULT 'system'`);
         
-        // Ensure constraints only added if index not already there (handled by create table and indexes logic)
-        // But for activity_logs, it's newly created, so this should be fine.
-        await queryRunner.query(`ALTER TABLE \`activity_logs\` ADD CONSTRAINT \`FK_1ce658094e7e55ec35c1a12d953\` FOREIGN KEY (\`adminId\`) REFERENCES \`admins\`(\`id\`) ON DELETE SET NULL ON UPDATE NO ACTION`);
+        // Safe add constraint for activity_logs
+        const activityLogsTable = await queryRunner.getTable("activity_logs");
+        if (activityLogsTable) {
+            const adminFk = activityLogsTable.foreignKeys.find(fk => fk.name === "FK_1ce658094e7e55ec35c1a12d953");
+            if (!adminFk) {
+                await queryRunner.query(`ALTER TABLE \`activity_logs\` ADD CONSTRAINT \`FK_1ce658094e7e55ec35c1a12d953\` FOREIGN KEY (\`adminId\`) REFERENCES \`admins\`(\`id\`) ON DELETE SET NULL ON UPDATE NO ACTION`);
+            }
+        }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
