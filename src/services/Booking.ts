@@ -583,10 +583,7 @@ export default class BookingService extends Service {
                 return this.responseData(400, true, "Booking must be accepted or scheduled first.");
 
 
-            const hasOnsite = booking.services.some(s => s.onsiteLocationService);
-            if (!hasOnsite)
-                return this.responseData(400, true, "This service does not support live tracking.");
-
+            // Note: We allow all service types to "start", but live tracking only happens for onsite.
             booking.status = BookingStatus.ON_THE_WAY;
             const updatedBooking = await this.repo.save(booking);
 

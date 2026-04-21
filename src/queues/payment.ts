@@ -72,11 +72,15 @@ payment.route(QueueEvents.PAYMENT_BOOK_SUCCESSFUL, async (message: any, io: Serv
             }
         }
 
+        const customerName = `${detailedBooking?.user?.firstName} ${detailedBooking?.user?.lastName}`.trim();
         await notify({
             userId: professionalId,
             userType: UserType.PROFESSIONAL,
             type: NotificationType.BOOKING_PAYMENT,
-            data: result
+            data: {
+                ...result,
+                body: `${customerName} has paid for the booking`
+            }
         });
 
         // Emit status update via socket to the booking room
@@ -107,11 +111,12 @@ payment.route(QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL, async (message: any, io
         const bookingRepo = AppDataSource.getRepository(Booking);
         const booking = await bookingRepo.findOne({ where: { id: bookingId }, relations: ["user"] });
 
+        const customerName = `${booking?.user?.firstName} ${booking?.user?.lastName}`.trim();
         await notify({
             userId: professionalId,
             userType: UserType.PROFESSIONAL,
-            type: NotificationType.BOOKING_PAYMENT, // Use a specific type if available, otherwise this works
-            data: { message: `A user has paid a commitment fee for a booking. You can now chat with ${booking?.user?.firstName}.`, bookingId }
+            type: NotificationType.BOOKING_PAYMENT,
+            data: { body: `${customerName} booked your service`, bookingId }
         });
 
         // Emit status update via socket to the booking room

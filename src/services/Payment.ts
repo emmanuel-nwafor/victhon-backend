@@ -646,11 +646,16 @@ export default class Payment extends BaseService {
                         logger.info(`[PAYMENT_WEBHOOK] Successfully updated booking ${booking.id} to PENDING and unlocked chat`);
 
                         // --- ALERT PROFESSIONAL NOW ---
+                        const customerName = `${booking.user?.firstName} ${booking.user?.lastName}`.trim();
                         notify({
                             userId: booking.professionalId,
                             userType: UserType.PROFESSIONAL,
                             type: NotificationType.BOOKING,
-                            data: { ...booking, professional: undefined },
+                            data: { 
+                                ...booking, 
+                                professional: undefined,
+                                body: `${customerName} booked your service`
+                            },
                         }).catch(err => logger.error(`[PAYMENT_WEBHOOK] Notification error: ${err.message}`));
 
                         eventToPublish = {
