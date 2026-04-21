@@ -32,7 +32,13 @@ export class CreateActivityLogTable1775943480355 implements MigrationInterface {
             const newIndexName = "IDX_051db7d37d478a69a7432df147";
             const hasNewIndex = adminsTable.indices.find(idx => idx.name === newIndexName);
             if (!hasNewIndex) {
-                await queryRunner.query(`ALTER TABLE \`admins\` ADD UNIQUE INDEX \`${newIndexName}\` (\`email\`)`);
+                try {
+                    await queryRunner.query(`ALTER TABLE \`admins\` ADD UNIQUE INDEX \`${newIndexName}\` (\`email\`)`);
+                } catch (error: any) {
+                    // 1061 is ER_DUP_KEYNAME
+                    if (error.errno !== 1061 && error.code !== 'ER_DUP_KEYNAME') throw error;
+                    console.log(`Index ${newIndexName} already exists, skipping...`);
+                }
             }
         }
 
@@ -44,9 +50,15 @@ export class CreateActivityLogTable1775943480355 implements MigrationInterface {
         // Safe add constraint for activity_logs
         const activityLogsTable = await queryRunner.getTable("activity_logs");
         if (activityLogsTable) {
-            const adminFk = activityLogsTable.foreignKeys.find(fk => fk.name === "FK_1ce658094e7e55ec35c1a12d953");
+            const adminFk = activityLogsTable.foreignKeys.find(fk => fk.name === "FK_1CE658094E7E55EC35C1A12D953" || fk.name === "FK_1ce658094e7e55ec35c1a12d953");
             if (!adminFk) {
-                await queryRunner.query(`ALTER TABLE \`activity_logs\` ADD CONSTRAINT \`FK_1ce658094e7e55ec35c1a12d953\` FOREIGN KEY (\`adminId\`) REFERENCES \`admins\`(\`id\`) ON DELETE SET NULL ON UPDATE NO ACTION`);
+                try {
+                    await queryRunner.query(`ALTER TABLE \`activity_logs\` ADD CONSTRAINT \`FK_1ce658094e7e55ec35c1a12d953\` FOREIGN KEY (\`adminId\`) REFERENCES \`admins\`(\`id\`) ON DELETE SET NULL ON UPDATE NO ACTION`);
+                } catch (error: any) {
+                    // 1826 is ER_FK_DUP_NAME
+                    if (error.errno !== 1826 && error.code !== 'ER_FK_DUP_NAME') throw error;
+                    console.log("Foreign key FK_1ce658094e7e55ec35c1a12d953 already exists, skipping...");
+                }
             }
         }
     }
