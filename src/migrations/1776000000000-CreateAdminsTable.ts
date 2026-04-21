@@ -5,7 +5,7 @@ export class CreateAdminsTable1776000000000 implements MigrationInterface {
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`
-            CREATE TABLE \`admins\` (
+            CREATE TABLE IF NOT EXISTS \`admins\` (
                 \`id\` varchar(36) NOT NULL,
                 \`email\` varchar(100) NOT NULL,
                 \`password\` text NOT NULL,

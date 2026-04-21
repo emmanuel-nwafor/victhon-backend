@@ -5,13 +5,27 @@ export class SyncDatabaseSchema1776100000000 implements MigrationInterface {
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // Add missing columns to disputes table
-        await queryRunner.query(`ALTER TABLE \`disputes\` ADD \`description\` text NULL`);
-        await queryRunner.query(`ALTER TABLE \`disputes\` ADD \`raisedBy\` varchar(255) NULL`);
-        await queryRunner.query(`ALTER TABLE \`disputes\` ADD \`evidenceUrls\` text NULL`);
+        const disputesTable = await queryRunner.getTable("disputes");
+        if (disputesTable) {
+            const hasDescription = disputesTable.columns.find(c => c.name === "description");
+            if (!hasDescription) {
+                await queryRunner.query(`ALTER TABLE \`disputes\` ADD \`description\` text NULL`);
+            }
+            
+            const hasRaisedBy = disputesTable.columns.find(c => c.name === "raisedBy");
+            if (!hasRaisedBy) {
+                await queryRunner.query(`ALTER TABLE \`disputes\` ADD \`raisedBy\` varchar(255) NULL`);
+            }
+            
+            const hasEvidenceUrls = disputesTable.columns.find(c => c.name === "evidenceUrls");
+            if (!hasEvidenceUrls) {
+                await queryRunner.query(`ALTER TABLE \`disputes\` ADD \`evidenceUrls\` text NULL`);
+            }
+        }
 
         // Create broadcasts table
         await queryRunner.query(`
-            CREATE TABLE \`broadcasts\` (
+            CREATE TABLE IF NOT EXISTS \`broadcasts\` (
                 \`id\` varchar(36) NOT NULL,
                 \`type\` enum ('push', 'email') NOT NULL,
                 \`targets\` varchar(255) NOT NULL,
