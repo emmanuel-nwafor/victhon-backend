@@ -79,13 +79,16 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
             if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-delivered", { messageId: newMessage.id });
 
             // send push notification if not actively in chat
+            const senderIdForName = newMessage.senderId;
+            const sender = newMessage.senderType === UserType.PROFESSIONAL
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderIdForName } })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderIdForName } });
+
+            const firstName = sender?.firstName || (newMessage.senderType === UserType.PROFESSIONAL ? "Professional" : "Customer");
+            const lastName = sender?.lastName || "";
+            const senderName = `${firstName} ${lastName}`.trim();
+
             if (!inChat) {
-                const sender = newMessage.senderType === UserType.PROFESSIONAL
-                    ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderId } })
-                    : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderId } });
-
-                const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
-
                 // Non-blocking push notification
                 notify({
                     userId: receiverId,
@@ -128,11 +131,14 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                 );
             });
             // Send push notification when user is offline
+            const senderIdForName = newMessage.senderId;
             const sender = newMessage.senderType === UserType.PROFESSIONAL
-                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderId } })
-                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderId } });
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderIdForName } })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderIdForName } });
 
-            const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
+            const firstName = sender?.firstName || (newMessage.senderType === UserType.PROFESSIONAL ? "Professional" : "Customer");
+            const lastName = sender?.lastName || "";
+            const senderName = `${firstName} ${lastName}`.trim();
 
             // Non-blocking push notification when user is offline
             notify({
@@ -423,13 +429,16 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
             if (senderSocketId) socketNamespace.to(senderSocketId).emit("attachment-delivered", { messageId: newMessage.id });
 
             // send push notification if not actively in chat
+            const senderIdForName = newMessage.senderId;
+            const sender = newMessage.senderType === UserType.PROFESSIONAL
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderIdForName } })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderIdForName } });
+
+            const firstName = sender?.firstName || (newMessage.senderType === UserType.PROFESSIONAL ? "Professional" : "Customer");
+            const lastName = sender?.lastName || "";
+            const senderName = `${firstName} ${lastName}`.trim();
+
             if (!inChat) {
-                const sender = newMessage.senderType === UserType.PROFESSIONAL
-                    ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: newMessage.senderId } })
-                    : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: newMessage.senderId } });
-
-                const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
-
                 // Non-blocking push notification
                 notify({
                     userId: receiverId,
@@ -475,11 +484,14 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
             logger.info(`message attachment added to inbox for ${receiverType}:${receiverId}`);
 
             // send push notification for offline user
+            const senderIdForName = newMessage.senderId;
             const sender = newMessage.senderType === UserType.PROFESSIONAL
-                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: newMessage.senderId } })
-                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: newMessage.senderId } });
+                ? await AppDataSource.getRepository(ProfessionalEntity).findOne({ where: { id: senderIdForName } })
+                : await AppDataSource.getRepository(UserEntity).findOne({ where: { id: senderIdForName } });
 
-            const senderName = sender ? `${sender.firstName} ${sender.lastName}` : "Someone";
+            const firstName = sender?.firstName || (newMessage.senderType === UserType.PROFESSIONAL ? "Professional" : "Customer");
+            const lastName = sender?.lastName || "";
+            const senderName = `${firstName} ${lastName}`.trim();
 
             // Non-blocking push notification when user is offline
             notify({

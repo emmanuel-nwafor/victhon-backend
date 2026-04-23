@@ -57,6 +57,9 @@ export class ServiceEntity {
     @Column({ type: 'json', nullable: true })
     images?: PhotoField[];
 
+    @Column({ type: 'boolean', default: false })
+    isNegotiable: boolean;
+
     @Column()
     professionalId: string;
 

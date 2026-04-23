@@ -72,7 +72,7 @@ export default class Authentication extends Service {
     }
   }
 
-  private generateToken(data: any, role: string, expiresIn: string = "100y") {
+  private generateToken(data: any, role: string, expiresIn: string = "30d") {
     return Token.createToken(this.tokenSecret, data, [role], expiresIn);
   }
 
@@ -374,7 +374,7 @@ export default class Authentication extends Service {
   }
 
   // * User(normal user) login service
-  public async login(email: string, password: string) {
+  public async login(email: string, password: string, deviceId?: string) {
     try {
       email = normalizeEmail(email);
       const userRepo = AppDataSource.getRepository(User);
@@ -412,14 +412,21 @@ export default class Authentication extends Service {
           }
 
           const token = this.generateUserToken(
-            { id: user.id, userType: UserType.USER },
+            { id: user.id, userType: UserType.USER, deviceId },
             UserType.USER,
           );
+
+          // Update current device ID if provided
+          if (deviceId) {
+            user.currentDeviceId = deviceId;
+            await userRepo.save(user);
+          }
 
           const data = {
             user: {
               ...user,
               password: undefined,
+              currentDeviceId: undefined,
             },
             token: token,
           };
@@ -546,7 +553,7 @@ export default class Authentication extends Service {
   //     }
   // }
 
-  public async professionalLogin(email: string, password: string) {
+  public async professionalLogin(email: string, password: string, deviceId?: string) {
     try {
       email = normalizeEmail(email);
       const professionalRepo = AppDataSource.getRepository(Professional);
@@ -587,6 +594,7 @@ export default class Authentication extends Service {
             {
               id: user.id,
               userType: UserType.PROFESSIONAL,
+              deviceId,
             },
             UserType.PROFESSIONAL,
           );
@@ -595,6 +603,11 @@ export default class Authentication extends Service {
             .replace(")", "")
             .split(" ");
 
+          if (deviceId) {
+            user.currentDeviceId = deviceId;
+            await professionalRepo.save(user);
+          }
+
           const data = {
             user: {
               ...user,
@@ -602,6 +615,7 @@ export default class Authentication extends Service {
               latitude: parseFloat(coords[1]),
               location: undefined,
               password: undefined,
+              currentDeviceId: undefined,
             },
             token: token,
           };

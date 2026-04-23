@@ -132,9 +132,18 @@ const PORT = env(EnvKey.PORT)!;
             if (IWorker.drained) worker.on('drained', IWorker.drained);
         }
 
-        const serverInstance = app.listen(PORT, () => {
+        const serverInstance = app.listen(PORT, async () => {
             logger.info(`🚀 Server successfully listening on port ${PORT}`);
             logger.info(`🌍 External URL: https://victhon-backend-khau.onrender.com`);
+
+            // Keep-alive ping on startup
+            try {
+                const url = "https://victhon-backend-khau.onrender.com/api/v1/health-bypass";
+                await axios.get(url);
+                logger.info(`✅ Keep-alive startup ping sent to ${url}`);
+            } catch (err: any) {
+                logger.warn(`⚠️ Keep-alive startup ping failed: ${err.message}`);
+            }
         });
 
         // TCP-level connection diagnostic
@@ -151,11 +160,21 @@ const PORT = env(EnvKey.PORT)!;
         serverInstance.on('error', (err) => {
             logger.error('❌ Server failed to start:', err);
         });
-    } catch (error) {
-        logger.error("Initialization error:", error);
+    } catch (err: any) {
+        logger.warn(`⚠️ Keep-alive startup ping failed: ${err.message}`);
     }
-
 })();
+
+cron.schedule('*/14 * * * *', async () => {
+    try {
+        const url = "https://victhon-backend-khau.onrender.com/api/v1/health-bypass";
+        const axios = require("axios");
+        await axios.get(url);
+        logger.info(`🔄 Keep-alive cron ping sent to ${url}`);
+    } catch (err: any) {
+        logger.warn(`⚠️ Keep-alive cron ping failed: ${err.message}`);
+    }
+});
 
 let isRunning = false;
 

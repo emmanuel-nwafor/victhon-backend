@@ -17,8 +17,8 @@ export default class Authentication {
 
     public static async login(req: Request, res: Response) {
         console.log(`[AUTH_CONTROLLER] Entering login for email: ${req.body?.email}`);
-        const { email, password } = req.body;
-        const serviceResult = await Authentication.service.login(email, password);
+        const { email, password, deviceId } = req.body;
+        const serviceResult = await Authentication.service.login(email, password, deviceId);
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 
@@ -41,8 +41,8 @@ export default class Authentication {
 
     public static async professionalLogin(req: Request, res: Response) {
         console.log(`[AUTH_CONTROLLER] Entering professionalLogin for email: ${req.body?.email}`);
-        const { email, password } = req.body;
-        const serviceResult = await Authentication.service.professionalLogin(email, password);
+        const { email, password, deviceId } = req.body;
+        const serviceResult = await Authentication.service.professionalLogin(email, password, deviceId);
         res.status(serviceResult.statusCode).json(serviceResult.json);
     }
 

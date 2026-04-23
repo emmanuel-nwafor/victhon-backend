@@ -70,12 +70,26 @@ const verifyJWT = (types: string[], neededData: string[] = ['data']) => async (r
         
         if (userRole === UserType.USER) {
             const userRepo = AppDataSource.getRepository(User);
-            const user = await userRepo.findOne({ select: ["id", "isActive"], where: { id: userData.id } });
-            if (user && !user.isActive) accountActive = false;
+            const user = await userRepo.findOne({ select: ["id", "isActive", "currentDeviceId"], where: { id: userData.id } });
+            if (user) {
+                if (!user.isActive) accountActive = false;
+                // Single device login check
+                if (userData.deviceId && user.currentDeviceId && userData.deviceId !== user.currentDeviceId) {
+                    res.status(401).json({ error: true, message: "Logged in from another device" });
+                    return;
+                }
+            }
         } else if (userRole === UserType.PROFESSIONAL) {
             const proRepo = AppDataSource.getRepository(Professional);
-            const pro = await proRepo.findOne({ select: ["id", "isActive"], where: { id: userData.id } });
-            if (pro && !pro.isActive) accountActive = false;
+            const pro = await proRepo.findOne({ select: ["id", "isActive", "currentDeviceId"], where: { id: userData.id } });
+            if (pro) {
+                if (!pro.isActive) accountActive = false;
+                // Single device login check
+                if (userData.deviceId && pro.currentDeviceId && userData.deviceId !== pro.currentDeviceId) {
+                    res.status(401).json({ error: true, message: "Logged in from another device" });
+                    return;
+                }
+            }
         } else if (userRole === UserType.Admin) {
             const adminRepo = AppDataSource.getRepository(Admin);
             const admin = await adminRepo.findOne({ select: ["id", "isActive"], where: { id: userData.id } });

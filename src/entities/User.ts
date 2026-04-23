@@ -59,6 +59,9 @@ export class User {
     @Column({ type: 'varchar', length: 255, nullable: true })
     pushToken: string;
 
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    currentDeviceId: string;
+
     @OneToMany(() => ChatParticipant, (chatParticipant) => chatParticipant.user)
     chatParticipants: ChatParticipant[];
 

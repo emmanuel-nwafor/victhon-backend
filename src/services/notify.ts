@@ -5,10 +5,11 @@ import { QueueEvents, QueueNames } from "../types/constants";
 export enum NotificationProvider {
     Email = "email",
     SOCKET = "socket",
-    PUSH = "push"
+    PUSH = "push",
+    BOTH = "both"
 }
 
-async function notify(data: any, provider: NotificationProvider = NotificationProvider.SOCKET) {
+async function notify(data: any, provider: NotificationProvider = NotificationProvider.BOTH) {
     const payload = { data, provider };
     const queueName = QueueNames.NOTIFICATION;
     const eventType = QueueEvents.NOTIFICATION_NOTIFY;

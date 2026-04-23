@@ -77,7 +77,7 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
     const { payload: { provider, data } } = message;
 
     try {
-        if (provider == "socket" || provider == "push") {
+        if (provider == "socket" || provider == "push" || provider == "both") {
             const userService = new UserService();
             const proService = new ProfessionalService();
 
@@ -104,13 +104,13 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             const savedNotification = await repo.save(newNotification);
 
             // handle socket notification
-            if (socketId && provider === "socket") {
+            if (socketId && (provider === "socket" || provider === "both")) {
                 const notificationNamespace = io.of(Namespaces.BASE);
                 notificationNamespace.to(socketId).emit("notification", { notification: savedNotification });
             }
 
             // handle push notification
-            if (recipient?.pushToken) {
+            if (recipient?.pushToken && (provider === "push" || provider === "both")) {
                 try {
                     const { title, body } = getNotificationContent(data.type, data.data);
 
