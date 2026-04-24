@@ -11,7 +11,7 @@ import Message, { MessageStatus } from "../../entities/MessageEntity";
 import { RabbitMQ } from "../../services/RabbitMQ";
 import OfflineNotification from "../../services/OfflineNotification";
 import Inbox from "../../services/Inbox";
-import { Not } from "typeorm";
+import { In, Not } from "typeorm";
 import ChatEntity from "../../entities/ChatEntity";
 import { Notification, NotificationStatus, NotificationType } from "../../entities/Notification";
 import NotificationService from "../../services/Notification";
@@ -378,7 +378,7 @@ export default class SocketHandler {
 
             const updated = await SocketHandler.messageRepo.update({
                 chat: { id: chatId },
-                status: MessageStatus.DELIVERED,
+                status: In([MessageStatus.DELIVERED, MessageStatus.PENDING]),
                 receiverId: userId,
                 receiverType: userType
             }, {

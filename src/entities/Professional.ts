@@ -68,7 +68,7 @@ export class Professional {
     @Column({ type: 'json', nullable: true })
     businessLogo?: PhotoField | null;
 
-    @Column({ type: 'varchar', length: 100, nullable: true })
+    @Column({ type: 'varchar', length: 500, nullable: true })
     bio: string;
 
     @Column({ type: "json", nullable: true })

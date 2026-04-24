@@ -50,6 +50,9 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
 
             await AppDataSource.transaction(async (manager) => {
                 if (inChat) {
+                    await manager.update(Message, {
+                        id: newMessage.id,
+                    }, { status: MessageStatus.READ });
                     if (senderSocketId) socketNamespace.to(senderSocketId).emit("message-read", { messageId: newMessage.id });
                 } else {
                     await manager.update(Message, {
