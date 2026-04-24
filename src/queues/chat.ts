@@ -98,7 +98,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                     userType: receiverType,
                     type: NotificationType.CHAT,
                     data: { ...newMessage, senderName, chat: undefined }
-                }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue chat notification (online):", err));
+                }, NotificationProvider.BOTH).catch(err => console.error("[CHAT_WORKER] Failed to queue chat notification (online):", err));
                 return;
             }
         } else {
@@ -149,7 +149,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_MESSAGE, async (message: any, io: Server) =>
                 userType: receiverType,
                 type: NotificationType.CHAT,
                 data: { ...newMessage, senderName, chat: undefined }
-            }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue chat notification (offline):", err));
+            }, NotificationProvider.BOTH).catch(err => console.error("[CHAT_WORKER] Failed to queue chat notification (offline):", err));
         }
     } catch (error) {
         console.error("CHAT_SEND_MESSAGE: ", error);
@@ -448,7 +448,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
                     userType: receiverType,
                     type: NotificationType.CHAT,
                     data: { ...newMessage, senderName, content: "Sent an attachment", chat: undefined }
-                }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue attachment notification (online):", err));
+                }, NotificationProvider.BOTH).catch(err => console.error("[CHAT_WORKER] Failed to queue attachment notification (online):", err));
                 return;
             }
         } else {
@@ -502,7 +502,7 @@ chat.route(QueueEvents.CHAT_RECEIVE_ATTACHMENT, async (message: any, io: Server)
                 userType: receiverType,
                 type: NotificationType.CHAT,
                 data: { ...newMessage, senderName, content: "Sent an attachment", chat: undefined }
-            }, NotificationProvider.PUSH).catch(err => console.error("[CHAT_WORKER] Failed to queue attachment notification (offline):", err));
+            }, NotificationProvider.BOTH).catch(err => console.error("[CHAT_WORKER] Failed to queue attachment notification (offline):", err));
         }
     } catch (error) {
         console.error("CHAT_RECEIVE_ATTACHMENT: ", error);
