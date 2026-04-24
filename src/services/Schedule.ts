@@ -11,25 +11,26 @@ export default class Schedule extends Service {
 
     public async createSchedules(
         userId: string,
-        schedules: any
+        schedules: any[]
     ) {
         try {
             const professionalRepo = AppDataSource.getRepository(ProfessionalEntity);
 
-            let user = await professionalRepo.findOne({ where: { id: userId } });
-            if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
+            let pro = await professionalRepo.findOne({ where: { id: userId } });
+            if (!pro) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
-            const newSchedules = schedules.map((schedule: any) =>
-                this.repo.create({
-                    ...schedule,
-                    professional: {id: userId}
-                })
-            );
-            const savedSchedules = await this.repo.save(newSchedules);
+            const data = schedules.map((s: any) => ({
+                ...s,
+                professionalId: userId
+            }));
 
-            return this.responseData(HttpStatus.OK, false, `Professional schedules were created successfully.`, savedSchedules);
+            // Use upsert to handle existing records based on the unique index [professionalId, dayOfWeek]
+            const result = await this.repo.upsert(data, ["professionalId", "dayOfWeek"]);
+
+            return this.responseData(HttpStatus.OK, false, `Professional schedules were updated successfully.`, result.identifiers);
 
         } catch (error) {
+            console.error("Bulk Schedule Error:", error);
             return this.handleTypeormError(error);
         }
     }
@@ -41,31 +42,32 @@ export default class Schedule extends Service {
         startTime: string,
         endTime: string,
         isActive: boolean,
-        validFrom: string | null,
-        validUntil: string | null
+        validFrom: string | null = null,
+        validUntil: string | null = null
     ) {
         try {
             const professionalRepo = AppDataSource.getRepository(ProfessionalEntity);
 
-            let user = await professionalRepo.findOne({ where: { id: userId } });
-            if (!user) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
+            let pro = await professionalRepo.findOne({ where: { id: userId } });
+            if (!pro) return this.responseData(HttpStatus.NOT_FOUND, true, `Professional was not found.`);
 
-            const scheduleRepo = AppDataSource.getRepository(ProfessionalSchedule);
-
-            const schedule = scheduleRepo.create({
+            const payload = {
                 professionalId: userId,
-                dayOfWeek: dayOfWeek,
-                startTime: startTime,
-                endTime: endTime,
-                isActive: isActive,
-                validFrom: validFrom,
-                validUntil: validUntil,
-            } as DeepPartial<ProfessionalSchedule>);
+                dayOfWeek,
+                startTime,
+                endTime,
+                isActive,
+                validFrom,
+                validUntil
+            };
 
-            await scheduleRepo.save(schedule);
-            return this.responseData(HttpStatus.OK, false, `Professional schedule was created successfully.`, schedule);
+            // Use upsert for single record too
+            const result = await this.repo.upsert(payload, ["professionalId", "dayOfWeek"]);
+            
+            return this.responseData(HttpStatus.OK, false, `Professional schedule was updated successfully.`, result.identifiers[0]);
 
         } catch (error) {
+            console.error("Single Schedule Error:", error);
             return this.handleTypeormError(error);
         }
     }

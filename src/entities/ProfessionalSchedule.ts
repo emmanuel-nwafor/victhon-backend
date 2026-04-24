@@ -17,12 +17,13 @@ export type DayOfWeek =
     | 'saturday'
     | 'sunday';
 
+@Index(['professionalId', 'dayOfWeek'], { unique: true })
 @Entity('professional_schedules')
 export class ProfessionalSchedule {
     @PrimaryGeneratedColumn("uuid")
     id: string;
 
-    @Column({ type: 'text' })
+    @Column({ type: 'varchar', length: 255 })
     professionalId!: string;
 
     @ManyToOne(
@@ -45,10 +46,10 @@ export class ProfessionalSchedule {
 
     // --- Optional: date range override (e.g. holiday closure) ---
     @Column({ type: 'date', nullable: true })
-    validFrom?: string;
+    validFrom?: string | null;
 
     @Column({ type: 'date', nullable: true })
-    validUntil?: string;
+    validUntil?: string | null;
 
     @Column({ default: true })
     isActive!: boolean;
