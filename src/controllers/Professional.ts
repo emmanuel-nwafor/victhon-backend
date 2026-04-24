@@ -58,4 +58,32 @@ export default class Professional {
         const serviceResult = await Professional.service.updateAvailability(userId, availability);
         Controller.response(res, serviceResult);
     }
+
+    /* --- Schedule Management --- */
+    private static scheduleService = new (require("../services/Schedule").default)();
+
+    public static async getSchedule(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { page, limit } = req.query;
+        const parsedPage = parseInt(page as string) || 1;
+        const parsedLimit = parseInt(limit as string) || 50; // Higher default for schedule
+
+        const result = await Professional.scheduleService.schedules(userId, parsedPage, parsedLimit);
+        Controller.response(res, result);
+    }
+
+    public static async createSchedule(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        const { dayOfWeek, startTime, endTime, isActive } = req.body;
+
+        const result = await Professional.scheduleService.createSchedule(userId, dayOfWeek, startTime, endTime, isActive);
+        Controller.response(res, result);
+    }
+
+    public static async createSchedules(req: Request, res: Response) {
+        const { id: userId } = res.locals.data;
+        // Bulk add
+        const result = await Professional.scheduleService.createSchedules(userId, req.body.schedules || req.body);
+        Controller.response(res, result);
+    }
 }

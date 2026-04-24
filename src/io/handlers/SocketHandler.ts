@@ -599,12 +599,14 @@ export default class SocketHandler {
             const notifService = new NotificationService();
             const result = await notifService.notifications(userId, userType, page, limit);
 
+            const { getNotificationContent } = require("../../utils/notification");
             const notifications = (result.json.data?.records || []).map((n: any) => {
+                const { title, body } = getNotificationContent(n.type, n.data);
                 return {
                     id: n.id,
                     type: n.type,
-                    title: n.data?.title || "Victhon Update",
-                    body: n.data?.body || "You have a new update.",
+                    title: title,
+                    body: body,
                     time: n.createdAt,
                     unread: !n.isRead,
                     data: n.data

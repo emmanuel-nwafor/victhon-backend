@@ -11,6 +11,7 @@ import ProfessionalService from "../services/Professional";
 import { exchange } from "../types";
 import { AppDataSource } from "../data-source";
 import PushNotificationService from "../services/PushNotificationService";
+import { getNotificationContent } from "../utils/notification";
 
 
 const notification = new RabbitMQRouter({
@@ -21,57 +22,10 @@ const notification = new RabbitMQRouter({
     handlers: {}
 });
 
+
 const service = new BaseService();
 const pushService = new PushNotificationService();
-console.log('Notification queue worker ready');
 
-
-function getNotificationContent(type: NotificationType, data: any) {
-    if (data?.message || data?.body) {
-        return { 
-            title: data?.title || "Victhon Update", 
-            body: data?.message || data?.body 
-        };
-    }
-
-    switch (type) {
-        case NotificationType.BOOKING:
-            return { title: "New Booking", body: "You have a new booking request!" };
-        case NotificationType.ACCEPTED_BOOKING:
-            return { title: "Booking Accepted", body: "Your booking has been accepted by the service provider." };
-        case NotificationType.REJECTED_BOOKING:
-            return { title: "Booking Rejected", body: "Your booking request was rejected." };
-        case NotificationType.VIEW_PROFILE:
-            return { title: "Profile View", body: "Someone just viewed your profile!" };
-        case NotificationType.BOOKING_PAYMENT:
-            return { title: "Payment Received", body: "Payment for your booking has been received and processed successfully." };
-        case NotificationType.CANCEL_BOOKING:
-            return { title: "Booking Cancelled", body: "A booking has been cancelled." };
-        case NotificationType.DISPUTED:
-            return { title: "Booking Disputed", body: "A dispute has been opened for a booking." };
-        case NotificationType.NEW_REVIEW:
-            return { title: "New Review", body: "You have received a new review!" };
-        case NotificationType.CHAT:
-            const senderName = data?.senderName || "Someone";
-            return { title: "New Message", body: `${senderName}: ${data?.content || "Sent you a message"}` };
-        case NotificationType.ON_THE_WAY:
-            return { title: "On The Way", body: "The service provider is on their way to your location." };
-        case NotificationType.COMPLETED:
-            return { title: "Service Completed", body: "The service has been marked as completed." };
-        case NotificationType.REVIEW_BOOKING:
-            return { title: "Booking in Review", body: "The service provider has marked the booking as ready for your review." };
-        case NotificationType.ESCROW_RELEASE:
-            return { title: "Funds Released", body: "Payment for your booking has been released to your wallet." };
-        case NotificationType.REFUND_FAILED:
-            return { title: "Refund Failed", body: "An attempt to refund your booking has failed. Please contact support." };
-        case NotificationType.REFUNDED_BOOKING:
-            return { title: "Booking Refunded", body: "Your booking has been successfully refunded." };
-        case NotificationType.WELCOME:
-            return { title: "Welcome to Victhon!", body: "We're glad to have you here. Explore and book services with ease!" };
-        default:
-            return { title: "Victhon Update", body: "You have a new notification." };
-    }
-}
 
 notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Server) => {
     const { payload: { provider, data } } = message;

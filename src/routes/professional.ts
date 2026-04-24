@@ -11,12 +11,9 @@ professional.post("/setup-business-profile", setupBusinessProfileValidator, asyn
 professional.patch("/push-token", asyncHandler(Controller.savePushToken));
 professional.patch("/availability", asyncHandler(Controller.updateAvailability));
 
-// professional.get("/views", asyncHandler(Controller.views));
-// professional.patch("/profile-photo", validatePhotoField, asyncHandler(Controller.uploadProfilePicture));
-
-// professional.post("/gallery/", validateWorkGalleryArray, asyncHandler(Controller.uploadGallery));
-
-// professional.post("/schedule", asyncHandler(Controller.createSchedule));
-
+// Schedule Management
+professional.get("/schedule", asyncHandler(Controller.getSchedule));
+professional.post("/schedule", asyncHandler(Controller.createSchedule));
+professional.post("/schedule/bulk", asyncHandler(Controller.createSchedules));
 
 export default professional;

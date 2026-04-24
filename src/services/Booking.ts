@@ -712,12 +712,17 @@ export default class BookingService extends Service {
         }
     }
 
-    public async getProBookings(proId: string, page: number, limit: number) {
+    public async getProBookings(proId: string, page: number, limit: number, status?: string) {
         try {
             const skip = (page - 1) * limit;
 
+            const where: any = { professionalId: proId };
+            if (status) {
+                where.status = status;
+            }
+
             const [bookings, total] = await this.repo.findAndCount({
-                where: { professionalId: proId },
+                where,
                 skip,
                 take: limit,
                 order: { createdAt: "DESC" }, // sort newest first

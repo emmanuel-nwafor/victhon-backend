@@ -87,13 +87,13 @@ export default class Booking {
 
     public static async getProBookings(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
-        let { page, limit } = req.query;
+        let { page, limit, status } = req.query;
 
         const parsedPage = parseInt(page as string) || 1;
         const parsedLimit = parseInt(limit as string) || 10;
 
 
-        const serviceResult = await Booking.service.getProBookings(userId, parsedPage, parsedLimit);
+        const serviceResult = await Booking.service.getProBookings(userId, parsedPage, parsedLimit, status as string);
 
         Controller.response(res, serviceResult);
     }

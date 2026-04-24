@@ -89,11 +89,22 @@ export default class ProfessionalService extends Service {
 
             const result = await this.repo.findOne({
                 where: { id, professionalId: userId },
-                relations: includeProfile ? ['professional'] : []
+                relations: ['professional', 'professional.ratingAggregate']
             });
             if (!result) return this.responseData(HttpStatus.NOT_FOUND, true, "Service not found.");
 
-            return this.responseData(HttpStatus.OK, false, `Service was retrieved successfully.`, result);
+            const bookingRepo = AppDataSource.getRepository(require("../entities/Booking").Booking);
+            const jobsCompleted = await bookingRepo.count({
+                where: { professionalId: userId, status: "completed" }
+            });
+
+            const data = {
+                ...result,
+                rating: result.professional?.ratingAggregate?.average || 0,
+                jobs_completed: jobsCompleted
+            };
+
+            return this.responseData(HttpStatus.OK, false, `Service was retrieved successfully.`, data);
         } catch (error) {
             return this.handleTypeormError(error);
         }
@@ -108,10 +119,21 @@ export default class ProfessionalService extends Service {
                 skip,
                 take: limit,
                 order: { updatedAt: "DESC" },
+                relations: ["professional", "professional.ratingAggregate"]
+            });
+
+            // Get total completed jobs for this professional
+            const bookingRepo = AppDataSource.getRepository(require("../entities/Booking").Booking);
+            const jobsCompleted = await bookingRepo.count({
+                where: { professionalId, status: "completed" }
             });
 
             const data = {
-                records: records,
+                records: records.map(r => ({
+                    ...r,
+                    rating: r.professional?.ratingAggregate?.average || 0,
+                    jobs_completed: jobsCompleted
+                })),
                 pagination: this.pagination(page, limit, total),
             }
 
@@ -125,14 +147,31 @@ export default class ProfessionalService extends Service {
         try {
             const skip = (page - 1) * limit;
 
-            const [records, total] = await this.repo.findAndCount({
-                skip,
-                take: limit,
-                order: { updatedAt: "DESC" },
-            });
+            const records = await this.repo.createQueryBuilder("service")
+                .leftJoinAndSelect("service.professional", "professional")
+                .leftJoinAndSelect("professional.ratingAggregate", "rating")
+                .orderBy("service.updatedAt", "DESC")
+                .skip(skip)
+                .take(limit)
+                .getMany();
+
+            const total = await this.repo.count();
+
+            // Attach jobs completed to each service
+            const bookingRepo = AppDataSource.getRepository(require("../entities/Booking").Booking);
+            const recordsWithMetrics = await Promise.all(records.map(async (r) => {
+                const jobsCompleted = await bookingRepo.count({
+                    where: { professionalId: r.professionalId, status: "completed" }
+                });
+                return {
+                    ...r,
+                    rating: r.professional?.ratingAggregate?.average || 0,
+                    jobs_completed: jobsCompleted
+                };
+            }));
 
             const data = {
-                records: records,
+                records: recordsWithMetrics,
                 pagination: this.pagination(page, limit, total),
             }
 
@@ -223,9 +262,21 @@ export default class ProfessionalService extends Service {
             /* -----------------------------
                Attach distance to entities
             ------------------------------*/
-            const professionals = result.entities.map((pro, index) => ({
-                ...pro,
-                distance: Number(result.raw[index].distance), // meters
+            const bookingRepo = AppDataSource.getRepository(require("../entities/Booking").Booking);
+            const ratingAggRepo = AppDataSource.getRepository(require("../entities/RatingAggregate").RatingAggregate);
+
+            const professionals = await Promise.all(result.entities.map(async (pro, index) => {
+                const [jobsCompleted, ratingAgg] = await Promise.all([
+                    bookingRepo.count({ where: { professionalId: pro.id, status: "completed" } }),
+                    ratingAggRepo.findOne({ where: { professionalId: pro.id } })
+                ]);
+
+                return {
+                    ...pro,
+                    distance: Number(result.raw[index].distance), // meters
+                    jobs_completed: jobsCompleted,
+                    rating: ratingAgg?.average || 0,
+                };
             }));
 
             const data = {
@@ -295,10 +346,26 @@ export default class ProfessionalService extends Service {
             // Sorting by latest updated
             query.orderBy("service.updatedAt", "DESC");
 
+            query
+                .leftJoinAndSelect("service.professional", "professional")
+                .leftJoinAndSelect("professional.ratingAggregate", "rating");
+
             const [services, total] = await query.getManyAndCount();
 
+            const bookingRepo = AppDataSource.getRepository(require("../entities/Booking").Booking);
+            const recordsWithMetrics = await Promise.all(services.map(async (s) => {
+                const jobsCompleted = await bookingRepo.count({
+                    where: { professionalId: s.professionalId, status: "completed" }
+                });
+                return {
+                    ...s,
+                    rating: s.professional?.ratingAggregate?.average || 0,
+                    jobs_completed: jobsCompleted
+                };
+            }));
+
             const data = {
-                records: services,
+                records: recordsWithMetrics,
                 pagination: this.pagination(page, limit, total),
             }
             return this.responseData(200, false, "Services have been retrieved successfully", data)
