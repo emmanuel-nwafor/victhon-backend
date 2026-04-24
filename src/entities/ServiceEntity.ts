@@ -60,6 +60,9 @@ export class ServiceEntity {
     @Column({ type: 'boolean', default: false })
     isNegotiable: boolean;
 
+    @Column({ type: 'boolean', default: true })
+    isActive: boolean;
+
     @Column()
     professionalId: string;
 

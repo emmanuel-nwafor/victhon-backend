@@ -93,6 +93,11 @@ export default class ProfessionalService extends Service {
             });
             if (!result) return this.responseData(HttpStatus.NOT_FOUND, true, "Service not found.");
 
+            // If a customer is viewing, and the service is inactive, deny access
+            if (includeProfile && !result.isActive) {
+                return this.responseData(HttpStatus.FORBIDDEN, true, "This service is currently inactive.");
+            }
+
             const bookingRepo = AppDataSource.getRepository(require("../entities/Booking").Booking);
             const jobsCompleted = await bookingRepo.count({
                 where: { professionalId: userId, status: "completed" }
@@ -110,12 +115,17 @@ export default class ProfessionalService extends Service {
         }
     }
 
-    public async professionalServices(professionalId: string, page: number, limit: number) {
+    public async professionalServices(professionalId: string, page: number, limit: number, onlyActive: boolean = false) {
         try {
             const skip = (page - 1) * limit;
 
+            const whereCondition: any = { professionalId: professionalId };
+            if (onlyActive) {
+                whereCondition.isActive = true;
+            }
+
             const [records, total] = await this.repo.findAndCount({
-                where: { professionalId: professionalId },
+                where: whereCondition,
                 skip,
                 take: limit,
                 order: { updatedAt: "DESC" },
@@ -150,12 +160,13 @@ export default class ProfessionalService extends Service {
             const records = await this.repo.createQueryBuilder("service")
                 .leftJoinAndSelect("service.professional", "professional")
                 .leftJoinAndSelect("professional.ratingAggregate", "rating")
+                .where("service.isActive = :isActive", { isActive: true })
                 .orderBy("service.updatedAt", "DESC")
                 .skip(skip)
                 .take(limit)
                 .getMany();
 
-            const total = await this.repo.count();
+            const total = await this.repo.count({ where: { isActive: true } });
 
             // Attach jobs completed to each service
             const bookingRepo = AppDataSource.getRepository(require("../entities/Booking").Booking);
@@ -308,7 +319,8 @@ export default class ProfessionalService extends Service {
                 page = 1
             } = options
 
-            const query = this.repo.createQueryBuilder("service");
+            const query = this.repo.createQueryBuilder("service")
+                .where("service.isActive = :isActive", { isActive: true });
 
             // Dynamic filters: only add them if present
             if (name) {
@@ -574,7 +586,8 @@ export default class ProfessionalService extends Service {
                 address: payload.address ?? existing.address,
                 remoteLocationService: payload.remoteLocationService ?? existing.remoteLocationService,
                 onsiteLocationService: payload.onsiteLocationService ?? existing.onsiteLocationService,
-                storeLocationService: payload.storeLocationService ?? existing.storeLocationService
+                storeLocationService: payload.storeLocationService ?? existing.storeLocationService,
+                isActive: payload.isActive ?? existing.isActive
             });
 
             return this.responseData(HttpStatus.OK, false, `Service was updated successfully.`);

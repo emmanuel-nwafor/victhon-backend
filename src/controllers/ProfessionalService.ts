@@ -33,11 +33,15 @@ export default class Package {
     public static async packages(req: Request, res: Response) {
         let {page, limit} = req.query;
         const {professionalId} = req.params;
+        const {id: userId, userType} = res.locals.data;
 
         const parsedPage = parseInt(page as string) || 1;
         const parsedLimit = parseInt(limit as string) || 10;
 
-        const serviceResult = await Package.service.professionalServices(professionalId!, parsedPage, parsedLimit);
+        // If the logged in user is not the professional themselves, only show active services
+        const onlyActive = !(userType === UserType.PROFESSIONAL && userId === professionalId);
+
+        const serviceResult = await Package.service.professionalServices(professionalId!, parsedPage, parsedLimit, onlyActive);
 
         Controller.response(res, serviceResult);
     }

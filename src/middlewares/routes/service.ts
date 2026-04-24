@@ -231,5 +231,10 @@ export const updateServiceValidator = [
         .optional()
         .isBoolean()
         .withMessage("storeLocationService must be boolean"),
+
+    body("isActive")
+        .optional()
+        .isBoolean()
+        .withMessage("isActive must be boolean"),
     handleValidationErrors
 ];
