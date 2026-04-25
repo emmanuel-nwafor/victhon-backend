@@ -66,12 +66,15 @@ notification.route(QueueEvents.NOTIFICATION_NOTIFY, async (message: any, io: Ser
             // handle push notification
             if (recipient?.pushToken && (provider === "push" || provider === "both")) {
                 try {
-                    const { title, body } = getNotificationContent(data.type, data.data);
-
-                    const result = await pushService.sendNotification(recipient.pushToken, title, body, {
+                    const { title, body, imageUrl } = getNotificationContent(data.type, data.data);
+                    
+                    const pushData = {
                         ...data,
-                        notificationId: savedNotification.id
-                    });
+                        notificationId: savedNotification.id,
+                        imageUrl
+                    };
+
+                    const result = await pushService.sendNotification(recipient.pushToken, title, body, pushData);
 
                     console.log(`[NOTIFICATION_WORKER] ✅ Push status for ${data.userId}: ${result?.length ? 'SENT' : 'FAILED'}`);
                 } catch (error) {

@@ -63,7 +63,7 @@ export default class PushNotificationService {
         continue;
       }
       // Construct a message
-      messages.push({
+      const message: ExpoPushMessage = {
         to: pushToken,
         sound,
         title,
@@ -71,7 +71,19 @@ export default class PushNotificationService {
         data,
         channelId: 'alerts',
         priority: 'high',
-      });
+      };
+
+      // Add rich media support if imageUrl exists
+      if (data?.imageUrl) {
+        // For iOS, attachments can be used if Notification Service Extension is setup, 
+        // however Expo's Go app and some managed setups support simple image display.
+        // We'll also keep it in data for custom handling.
+        (message as any)._display = {
+          image: data.imageUrl
+        };
+      }
+
+      messages.push(message);
     }
 
     // batch the messages to send multiple at once

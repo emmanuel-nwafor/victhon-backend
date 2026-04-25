@@ -51,9 +51,21 @@ export function getNotificationContent(type: string, data: any) {
             };
         case NotificationType.CHAT.toLowerCase():
             const senderName = data?.senderName || "Customer";
+            let chatBody = overrideBody || `${senderName}: ${data?.content || "Sent you a message"}`;
+            let imageUrl = null;
+
+            // If it's an attachment, try to get the first one's URL
+            if (data?.attachments && Array.isArray(data.attachments) && data.attachments.length > 0) {
+                imageUrl = data.attachments[0].url;
+                if (!data?.content || data.content === "attachments" || data.content === "Sent an attachment") {
+                    chatBody = `${senderName} sent an image 📷`;
+                }
+            }
+
             return {
                 title: overrideTitle || "New Message",
-                body: overrideBody || `${senderName}: ${data?.content || "Sent you a message"}`
+                body: chatBody,
+                imageUrl
             };
         case NotificationType.ON_THE_WAY.toLowerCase():
             return {
