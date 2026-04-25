@@ -288,23 +288,25 @@ export default class Payment extends BaseService {
 
         const isSuccessful = data.status === "successful";
 
-        if (data.tx_ref) {
-          // Save flwTransactionId on transaction record
-          await this.transactionRepo.update(
-            { reference: data.tx_ref },
-            {
-              flwTransactionId: String(flwTransactionId),
-              status: isSuccessful
-                ? TransactionStatus.SUCCESS
-                : TransactionStatus.FAILED,
-            },
-          );
+          if (data.tx_ref) {
+            // Save flwTransactionId on transaction record first
+            await this.transactionRepo.update(
+              { reference: data.tx_ref },
+              { flwTransactionId: String(flwTransactionId) }
+            );
 
-          // If successful, process all charge side effects (wallet, escrow, chat unlocking)
-          if (isSuccessful) {
-            await this.successfulCharge(data);
+            // If successful, process all charge side effects (wallet, escrow, chat unlocking)
+            // successfulCharge will handle the status update to SUCCESS
+            if (isSuccessful) {
+              await this.successfulCharge(data);
+            } else {
+              // If failed, we still mark it as failed here
+              await this.transactionRepo.update(
+                { reference: data.tx_ref },
+                { status: TransactionStatus.FAILED }
+              );
+            }
           }
-        }
 
         return this.responseData(
           200,
@@ -592,7 +594,7 @@ export default class Payment extends BaseService {
           };
         } else if (payment.type === TransactionType.COMMITMENT_FEE) {
             // Robust bookingId extraction
-            const bookingId = eventData.metadata?.bookingId || payment.reference?.split('_')[1];
+            const bookingId = eventData.metadata?.bookingId || eventData.meta?.bookingId || payment.reference?.split('_')[1];
             
             logger.info(`[PAYMENT_WEBHOOK] Processing Commitment Fee for booking: ${bookingId}`);
 
