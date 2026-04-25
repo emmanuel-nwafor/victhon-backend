@@ -15,6 +15,8 @@ import { In, Not } from "typeorm";
 import ChatEntity from "../../entities/ChatEntity";
 import { Notification, NotificationStatus, NotificationType } from "../../entities/Notification";
 import NotificationService from "../../services/Notification";
+import { User as UserEntity } from "../../entities/User";
+import { Professional as ProfessionalEntity } from "../../entities/Professional";
 
 
 interface SendMessagePayload {
@@ -49,6 +51,9 @@ export default class SocketHandler {
             inbox.deliverInbox(userId, userType).catch(err => console.error("Inbox delivery error:", err));
 
             logger.info(`🤝 ${userType}:${userId} with the socket id - ${socketId} has connected.`);
+            
+            // Broadcast online status
+            SocketHandler.broadcastPresence(io, userId, userType, "online");
         } catch (error) {
             console.error("Failed to connect: ", error);
         }
@@ -478,6 +483,9 @@ export default class SocketHandler {
             if (!deletedChats) logger.error(`❌  An internal error occurred, failed to remove ${userType}:${userId} chats from cache`);
 
             logger.info(`👋 ${userType}:${userId} with the socket id - ${socket.id} has disconnected.`);
+            
+            // Broadcast offline status
+            SocketHandler.broadcastPresence(io, userId, userType, "offline");
         } catch (error) {
             console.error("❌ Error in disconnect:", error);
         }
@@ -553,6 +561,59 @@ export default class SocketHandler {
         } catch (error) {
             logger.error("getNotifications error:", error);
             socket.emit("appError", Handler.responseData(true, "Failed to load notifications"));
+        }
+    }
+
+    public static async checkPresence(io: Server, socket: ISocket, data: any) {
+        const { userId, userType } = data;
+        if (!userId || !userType) return;
+
+        const otherUserService = userType === UserType.PROFESSIONAL ? SocketHandler.proService : SocketHandler.userService;
+        const socketId = await otherUserService.getSocketId(userId);
+
+        socket.emit("presence-update", {
+            userId,
+            userType,
+            status: socketId ? "online" : "offline"
+        });
+    }
+
+    private static async broadcastPresence(io: Server, userId: string, userType: UserType, status: "online" | "offline") {
+        try {
+            // Find all chats where this user is a participant
+            const chats = await SocketHandler.chatParticipantsRepo.find({
+                where: userType === UserType.PROFESSIONAL ? { professionalId: userId } : { userId },
+                relations: ["chat", "chat.participants"]
+            });
+
+            const socketNamespace = io.of(Namespaces.BASE);
+            const partners = new Set<{ id: string, type: UserType }>();
+
+            for (const chat of chats) {
+                for (const p of chat.chat.participants) {
+                    const pId = p.userId ?? p.professionalId;
+                    const pType = p.userId ? UserType.USER : UserType.PROFESSIONAL;
+                    
+                    if (pId !== userId) {
+                        partners.add({ id: pId!, type: pType });
+                    }
+                }
+            }
+
+            for (const partner of partners) {
+                const partnerService = partner.type === UserType.PROFESSIONAL ? SocketHandler.proService : SocketHandler.userService;
+                const partnerSocketId = await partnerService.getSocketId(partner.id);
+                
+                if (partnerSocketId) {
+                    socketNamespace.to(partnerSocketId).emit("presence-update", {
+                        userId,
+                        userType,
+                        status
+                    });
+                }
+            }
+        } catch (error) {
+            logger.error("Error broadcasting presence:", error);
         }
     }
 }
