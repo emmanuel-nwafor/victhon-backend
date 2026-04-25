@@ -54,4 +54,29 @@ export default class Notification extends Service {
         }
     }
 
+    public async deleteNotification(id: string, userId: string, userType: UserType) {
+        try {
+            const userQuery = userType == UserType.USER ? { userId: userId } : { professionalId: userId };
+            const notification = await this.repo.findOne({ where: { id, ...userQuery } });
+            
+            if (!notification) {
+                return this.responseData(404, true, "Notification not found");
+            }
+
+            await this.repo.remove(notification);
+            return this.responseData(200, false, "Notification deleted successfully");
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
+
+    public async deleteAllNotifications(userId: string, userType: UserType) {
+        try {
+            const userQuery = userType == UserType.USER ? { userId: userId } : { professionalId: userId };
+            await this.repo.delete(userQuery);
+            return this.responseData(200, false, "All notifications deleted successfully");
+        } catch (error) {
+            return this.handleTypeormError(error);
+        }
+    }
 }

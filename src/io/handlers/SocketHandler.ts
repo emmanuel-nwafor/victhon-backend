@@ -564,6 +564,51 @@ export default class SocketHandler {
         }
     }
 
+    public static async deleteNotification(io: Server, socket: ISocket, data: any) {
+        try {
+            const userId = socket.locals.data.id;
+            const userType = socket.locals.data.userType;
+            const { notificationId } = data;
+
+            if (!notificationId) {
+                return socket.emit("appError", Handler.responseData(true, "Notification ID is required"));
+            }
+
+            const notifService = new NotificationService();
+            const result = await notifService.deleteNotification(notificationId, userId, userType);
+
+            if (result.json.error) {
+                return socket.emit("appError", result.json);
+            }
+
+            socket.emit("notification-deleted", { notificationId });
+            logger.info(`Done deleting notification ${notificationId} for ${userType}:${userId}`);
+        } catch (error) {
+            logger.error("deleteNotification error:", error);
+            socket.emit("appError", Handler.responseData(true, "Failed to delete notification"));
+        }
+    }
+
+    public static async deleteAllNotifications(io: Server, socket: ISocket, data: any) {
+        try {
+            const userId = socket.locals.data.id;
+            const userType = socket.locals.data.userType;
+
+            const notifService = new NotificationService();
+            const result = await notifService.deleteAllNotifications(userId, userType);
+
+            if (result.json.error) {
+                return socket.emit("appError", result.json);
+            }
+
+            socket.emit("all-notifications-deleted");
+            logger.info(`Done deleting all notifications for ${userType}:${userId}`);
+        } catch (error) {
+            logger.error("deleteAllNotifications error:", error);
+            socket.emit("appError", Handler.responseData(true, "Failed to delete all notifications"));
+        }
+    }
+
     public static async checkPresence(io: Server, socket: ISocket, data: any) {
         const { userId, userType } = data;
         if (!userId || !userType) return;

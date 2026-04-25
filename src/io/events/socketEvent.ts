@@ -13,6 +13,8 @@ socketEvent.register("delete-messages", SocketHandler.deleteMessages.bind(Socket
 socketEvent.register("update-location", SocketHandler.updateLocation.bind(SocketHandler));
 socketEvent.register("join-booking", SocketHandler.joinBooking.bind(SocketHandler));
 socketEvent.register("get-notifications", SocketHandler.getNotifications.bind(SocketHandler));
+socketEvent.register("delete-notification", SocketHandler.deleteNotification.bind(SocketHandler));
+socketEvent.register("delete-all-notifications", SocketHandler.deleteAllNotifications.bind(SocketHandler));
 socketEvent.register("check-presence", SocketHandler.checkPresence.bind(SocketHandler));
 socketEvent.register("disconnect", SocketHandler.disconnect.bind(SocketHandler));
 
