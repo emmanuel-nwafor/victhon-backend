@@ -300,44 +300,9 @@ export default class Payment extends BaseService {
             },
           );
 
-          // If successful, mark escrow as PAID directly (don't rely on webhook alone)
+          // If successful, process all charge side effects (wallet, escrow, chat unlocking)
           if (isSuccessful) {
-            const transaction = await this.transactionRepo.findOne({
-              where: { reference: data.tx_ref },
-              relations: [
-                "escrow",
-                "escrow.booking",
-                "escrow.booking.professional",
-                "escrow.booking.professional.wallet",
-              ],
-            });
-
-            if (
-              transaction?.escrow &&
-              transaction.escrow.status !== EscrowStatus.PAID
-            ) {
-              await this.escrowRepo.update(
-                { id: transaction.escrow.id },
-                { status: EscrowStatus.PAID },
-              );
-
-              // Update wallet pending amount
-              const wallet = transaction.escrow.booking?.professional?.wallet;
-              if (wallet) {
-                const newPendingAmount =
-                  Number(wallet.pendingAmount) +
-                  Number(transaction.escrow.amount);
-                const newTotalBalance =
-                  Number(wallet.balance) + newPendingAmount;
-                await this.walletRepo.update(
-                  { id: wallet.id },
-                  {
-                    pendingAmount: newPendingAmount,
-                    totalBalance: newTotalBalance,
-                  },
-                );
-              }
-            }
+            await this.successfulCharge(data);
           }
         }
 

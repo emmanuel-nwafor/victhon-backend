@@ -546,6 +546,19 @@ export default class BookingService extends Service {
                         booking.status = BookingStatus.REVIEW;
                     }
                     await manager.save(booking);
+
+                    // notify customer that professional has completed their part
+                    notify({
+                        userId: booking.userId,
+                        userType: UserType.USER,
+                        type: NotificationType.REVIEW_BOOKING,
+                        data: { 
+                            ...booking, 
+                            professional: undefined, 
+                            escrow: undefined,
+                            body: "Your provider has marked the service as complete. Please confirm to release funds."
+                        }
+                    }).catch(err => console.error("Failed to notify customer of review state:", err));
                 }
 
                 return booking;
