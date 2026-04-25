@@ -44,12 +44,13 @@ export function getNotificationContent(type: string, data: any) {
             };
         case NotificationType.NEW_REVIEW.toLowerCase():
             const rating = data?.rating || data?.review?.rating || "new";
+            const reviewer = data?.customerName || "Customer";
             return {
                 title: overrideTitle || "New Review Received",
-                body: overrideBody || `Someone left a ${rating} star review on your profile.`
+                body: overrideBody || `${reviewer} left a ${rating} star review on your profile.`
             };
         case NotificationType.CHAT.toLowerCase():
-            const senderName = data?.senderName || "A user";
+            const senderName = data?.senderName || "Customer";
             return {
                 title: overrideTitle || "New Message",
                 body: overrideBody || `${senderName}: ${data?.content || "Sent you a message"}`

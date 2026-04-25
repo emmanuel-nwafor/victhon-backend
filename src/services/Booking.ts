@@ -21,6 +21,7 @@ import Payment from "./Payment";
 import { RabbitMQ } from "./RabbitMQ";
 import Service from "./Service";
 import logger from "../config/logger";
+import AdminNotify from "./AdminNotify";
 
 export default class BookingService extends Service {
     private readonly repo = AppDataSource.getRepository(Booking);
@@ -179,6 +180,9 @@ export default class BookingService extends Service {
             });
 
 
+
+            // Notify Admin
+            AdminNotify.broadcast("new-booking", data);
 
             return this.responseData(
                 201,
@@ -487,10 +491,7 @@ export default class BookingService extends Service {
             const result = await AppDataSource.transaction(async (manager) => {
                 const booking = await manager.findOne(Booking, {
                     where: { id: bookingId, professionalId: proId },
-                    relations: {
-                        escrow: true,
-                        professional: { wallet: true },
-                    },
+                    relations: ["escrow", "professional", "professional.wallet"],
                     lock: { mode: "pessimistic_write" },
                 });
 
@@ -548,6 +549,7 @@ export default class BookingService extends Service {
                     await manager.save(booking);
 
                     // notify customer that professional has completed their part
+                    const providerName = booking.professional?.businessName || booking.professional?.firstName || "Your provider";
                     notify({
                         userId: booking.userId,
                         userType: UserType.USER,
@@ -556,7 +558,7 @@ export default class BookingService extends Service {
                             ...booking, 
                             professional: undefined, 
                             escrow: undefined,
-                            body: "Your provider has marked the service as complete. Please confirm to release funds."
+                            body: `${providerName} has marked the service as complete. Please confirm to release funds.`
                         }
                     }).catch(err => console.error("Failed to notify customer of review state:", err));
                 }

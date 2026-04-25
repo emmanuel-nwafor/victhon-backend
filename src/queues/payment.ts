@@ -13,6 +13,7 @@ import { Transaction } from "../entities/Transaction";
 import { Booking, BookingStatus } from "../entities/Booking";
 import Email from "../services/Email";
 import Chat from "../services/Chat";
+import AdminNotify from "../services/AdminNotify";
 
 const service = new BaseService();
 
@@ -92,6 +93,9 @@ payment.route(QueueEvents.PAYMENT_BOOK_SUCCESSFUL, async (message: any, io: Serv
             logger.info(`📍 Emailed and emitted status-updated for booking:${bookingId}`);
         }
 
+        // Notify Admin
+        AdminNotify.broadcast("stats-update", { type: "payment" });
+
         logger.info(`e👌 Booking payment was completed for transaction:${transactionId}`);
     } catch (error) {
         service.handleTypeormError(error);
@@ -125,6 +129,26 @@ payment.route(QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL, async (message: any, io
         });
 
         logger.info(`💬 Chat unlocked, status emitted, and professional notified for booking:${bookingId}`);
+
+        // --- NEW: Send Receipt on Commitment Fee ---
+        if (booking && booking.user) {
+            const bookingRepo = AppDataSource.getRepository(Booking);
+            const detailedBooking = await bookingRepo.findOne({
+                where: { id: bookingId },
+                relations: ["user", "professional", "services"]
+            });
+            if (detailedBooking) {
+                const emailService = new Email();
+                await emailService.sendBookingReceipt(
+                    detailedBooking.user.email,
+                    detailedBooking.user.firstName,
+                    detailedBooking
+                ).catch(err => logger.error(`[PAYMENT_COMMITMENT] Email error: ${err.message}`));
+            }
+        }
+
+        // Notify Admin
+        AdminNotify.broadcast("stats-update", { type: "commitment" });
     } catch (error: any) {
         logger.error(`Error handling commitment success: ${error.message}`);
         service.handleTypeormError(error);

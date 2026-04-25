@@ -14,9 +14,10 @@ import EmailService from "./Email";
 import Password from "../utils/Password";
 import Service from "./Service";
 import Token from "./Token";
-import logger from "../config/logger";
 import notify from "./notify";
 import { NotificationType } from "../entities/Notification";
+import AdminNotify from "./AdminNotify";
+import logger from "../config/logger";
 
 export default class Authentication extends Service {
   protected readonly storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -105,7 +106,7 @@ export default class Authentication extends Service {
       if (userType === UserType.USER) {
         const userRepo = AppDataSource.getRepository(User);
         const proRepo = AppDataSource.getRepository(Professional);
-        
+
         let user = await userRepo.findOneBy({ email });
         if (user) {
           if (!user.isActive) {
@@ -120,7 +121,7 @@ export default class Authentication extends Service {
             token,
           });
         }
-        
+
         // Check if they exist as a professional
         const existingPro = await proRepo.findOneBy({ email });
         if (existingPro) {
@@ -164,7 +165,7 @@ export default class Authentication extends Service {
       } else {
         const professionalRepo = AppDataSource.getRepository(Professional);
         const userRepo = AppDataSource.getRepository(User);
-        
+
         let pro = await professionalRepo.findOneBy({ email });
         if (pro) {
           if (!pro.isActive) {
@@ -195,7 +196,7 @@ export default class Authentication extends Service {
             token,
           });
         }
-        
+
         // Check if they exist as a user
         const existingUser = await userRepo.findOneBy({ email });
         if (existingUser) {
@@ -246,7 +247,7 @@ export default class Authentication extends Service {
       }
     } catch (error: any) {
       console.error("Google Auth Error:", error.response?.data || error.message);
-      
+
       let message = error.response?.data?.error_description || error.response?.data?.message;
 
       if (!message) {
@@ -749,6 +750,9 @@ export default class Authentication extends Service {
           data: { name: savedUser.firstName || "User" }
         });
 
+        // Notify Admin
+        AdminNotify.broadcast("new-user", savedUser);
+
         return this.responseData(200, false, "OTP verified successfully", {
           user: {
             ...savedUser,
@@ -784,6 +788,9 @@ export default class Authentication extends Service {
         type: NotificationType.WELCOME,
         data: { name: savedProfessional.firstName || "Professional" }
       });
+
+      // Notify Admin
+      AdminNotify.broadcast("new-user", savedProfessional);
 
       const coords = (savedProfessional.location as any)
         .replace("POINT(", "")

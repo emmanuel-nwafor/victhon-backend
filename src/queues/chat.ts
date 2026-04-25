@@ -330,7 +330,7 @@ chat.route(QueueEvents.CHAT_SEND_ATTACHMENT, async (message: any, io: Server) =>
                 uploadedFiles,
                 failedFiles,
                 publicIds
-            } = await cloudinary.uploadV2(files, ResourceType.AUTO, CdnFolders.CHAT));
+            } = await cloudinary.uploadV2(files, ResourceType.IMAGE, CdnFolders.CHAT));
             if (failedFiles?.length > 0 && senderSocketId) {
                 socketNamespace.to(senderSocketId).emit(
                     "appError",

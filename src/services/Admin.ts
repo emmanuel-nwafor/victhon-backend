@@ -19,6 +19,7 @@ import Cloudinary from "./Cloudinary";
 import { CdnFolders, ResourceType } from "../types/constants";
 import Payment from "./Payment";
 import { RabbitMQ } from "./RabbitMQ";
+import AdminNotify from "./AdminNotify";
 
 export default class AdminService extends Service {
     private storedSalt: string = env(EnvKey.STORED_SALT)!;
@@ -508,6 +509,10 @@ export default class AdminService extends Service {
                 if (data.autoRefundHours !== undefined) settings.autoRefundHours = data.autoRefundHours;
             }
             await settingsRepo.save(settings!);
+
+            // Broadcast update to other admin sessions
+            AdminNotify.broadcast("stats-update", { type: "settings" });
+
             return this.responseData(HttpStatus.OK, false, "Platform Settings updated", settings);
         } catch (error) {
             return this.handleTypeormError(error);

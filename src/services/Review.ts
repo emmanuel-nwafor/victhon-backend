@@ -92,11 +92,20 @@ export default class Review extends Service {
             });
 
             if (data) {
+                // Fetch user name for the notification
+                const user = await AppDataSource.getRepository('User').findOne({ 
+                    where: { id: userId },
+                    select: ['firstName', 'lastName'] 
+                });
+                
                 notify({
                     userId: professionalId,
                     userType: UserType.PROFESSIONAL,
                     type: NotificationType.NEW_REVIEW,
-                    data: data
+                    data: { 
+                        ...data, 
+                        customerName: user ? `${user.firstName} ${user.lastName}` : "A customer" 
+                    }
                 }).catch(err => console.error("[REVIEW_FLOW] Failed to queue review notification:", err));
             }
 

@@ -45,6 +45,14 @@ export default class Chat extends Service {
 
     public async sendAttachment(senderId: string, senderType: UserType, chatId: string, content: string | null, files: Express.Multer.File[]) {
         try {
+            // Filter for images only and strict 2MB limit
+            const sizeLimit = 2 * 1024 * 1024;
+            const validFiles = files.filter(f => f.mimetype.startsWith('image/') && f.size <= sizeLimit);
+
+            if (validFiles.length === 0 && files.length > 0) {
+                await deleteFiles(files);
+                return this.responseData(400, true, "Only images under 2MB are allowed.");
+            }
 
             const chat = await this.repo.findOne({
                 where: {
@@ -94,12 +102,12 @@ export default class Chat extends Service {
                         senderId,
                         content,
                         senderType,
-                        files: this.convertToFileObject(files)
+                        files: this.convertToFileObject(validFiles)
                     },
                 });
             }
 
-            return this.responseData(201, false, "Attachments are been uploaded successfully", receiver);
+            return this.responseData(201, false, "Attachments are being uploaded successfully", receiver);
         } catch (error) {
             if (files) {
                 await deleteFiles(files);
@@ -130,6 +138,15 @@ export default class Chat extends Service {
             }[] = [];
 
             if (files) {
+                // Filter for images only and strict 2MB limit
+                const sizeLimit = 2 * 1024 * 1024;
+                const validFiles = files.filter(f => f.mimetype.startsWith('image/') && f.size <= sizeLimit);
+
+                if (validFiles.length === 0 && files.length > 0) {
+                    await deleteFiles(files);
+                    return this.responseData(400, true, "Only images under 2MB are allowed.");
+                }
+
                 const cloudinary = new Cloudinary();
 
                 let uploadedFiles: UploadedFiles[] = [], publicIds: string[] = [], failedFiles: FailedFiles[] = [];
@@ -137,7 +154,7 @@ export default class Chat extends Service {
                     uploadedFiles,
                     failedFiles,
                     publicIds
-                } = await cloudinary.uploadV2(files, ResourceType.IMAGE, CdnFolders.CHAT));
+                } = await cloudinary.uploadV2(validFiles, ResourceType.IMAGE, CdnFolders.CHAT));
                 if (failedFiles?.length > 0) return this.responseData(500, true, "File uploads failed", failedFiles);
 
                 images = uploadedFiles.map((upload) => ({

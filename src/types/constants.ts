@@ -23,6 +23,7 @@ export enum Events {
 export enum Namespaces {
     NOTIFICATION = '/notification',
     BASE = '/api/v1/socket',
+    ADMIN = '/api/v1/socket/admin',
 }
 
 

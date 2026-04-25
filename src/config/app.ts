@@ -9,6 +9,7 @@ import { User } from "../entities/User";
 import multerErrorHandler from "../middlewares/multerErrorHandler";
 import initializeIO from "./io";
 import logger from "./logger";
+import AdminNotify from "../services/AdminNotify";
 
 import account from "../routes/account";
 import auth from "../routes/auth";
@@ -36,6 +37,7 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     const stream = { write: (message: string) => logger.http(message.trim()) };
     const server = http.createServer(app);
     const io = await initializeIO(server, pubClient, subClient);
+    AdminNotify.initialize(io);
 
     // 0. HEALTH BYPASS (No middleware)
     app.get("/api/v1/health-bypass", (req: Request, res: Response) => {
@@ -75,6 +77,10 @@ export default async function createApp(pubClient: RedisClientType, subClient: R
     const socketNamespace = io.of(Namespaces.BASE);
     socketNamespace.use(validateJWT([UserType.USER, UserType.PROFESSIONAL]));
     socketEvent.initialize(socketNamespace, io);
+
+    const adminNamespace = io.of(Namespaces.ADMIN);
+    adminNamespace.use(validateJWT([UserType.Admin]));
+    socketEvent.initialize(adminNamespace, io);
 
 
     app.use("/api/v1/auth", auth);
