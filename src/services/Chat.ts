@@ -215,6 +215,7 @@ export default class Chat extends Service {
 
                 const chatExists = await manager
                     .createQueryBuilder(ChatParticipant, "cp")
+                    .leftJoinAndSelect("cp.chat", "chat") // Load the chat relation
                     .innerJoin(
                         ChatParticipant,
                         "cp2",
@@ -227,7 +228,11 @@ export default class Chat extends Service {
                         userId: user.id,
                     })
                     .getOne();
-                if (chatExists) throw new TransactionError("Chat already exists");
+
+                if (chatExists) {
+                    const existingChat = await manager.findOne(ChatEntity, { where: { id: chatExists.chat.id } });
+                    return { chat: existingChat, user, professional };
+                }
 
                 const newChat = manager.create(ChatEntity, {});
                 const chat = await manager.save(newChat);
