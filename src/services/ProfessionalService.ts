@@ -3,7 +3,7 @@ import { PhotoField, Professional } from "../entities/Professional";
 import { CdnFolders, HttpStatus, ResourceType } from "../types/constants";
 import Service from "./Service";
 import { ServiceEntity } from "../entities/ServiceEntity";
-import { DeepPartial } from "typeorm";
+import { DeepPartial, Brackets } from "typeorm";
 import Cloudinary from "./Cloudinary";
 import { FailedFiles, UploadedFiles } from "../types";
 import deleteFiles from "../utils/deleteFiles";
@@ -12,6 +12,8 @@ interface ServiceSearchOptions {
     name?: string | undefined;
     category?: string | undefined;
     description?: string | undefined;
+    state?: string | undefined;
+    availability?: boolean | undefined;
     minPrice?: number | undefined;
     maxPrice?: number | undefined;
     remote?: boolean | undefined;
@@ -309,6 +311,8 @@ export default class ProfessionalService extends Service {
                 name,
                 category,
                 description,
+                state,
+                availability,
                 minPrice,
                 maxPrice,
                 remote,
@@ -320,19 +324,39 @@ export default class ProfessionalService extends Service {
             } = options
 
             const query = this.repo.createQueryBuilder("service")
+                .leftJoinAndSelect("service.professional", "professional")
+                .leftJoinAndSelect("professional.ratingAggregate", "rating")
                 .where("service.isActive = :isActive", { isActive: true });
 
-            // Dynamic filters: only add them if present
+            // Grouped keyword search to prevent breaking other andWhere conditions
             if (name) {
-                query.orWhere("service.name LIKE :name", { name: `%${name}%` });
+                query.andWhere(new Brackets(qb => {
+                    qb.where("service.name LIKE :name", { name: `%${name}%` })
+                      .orWhere("service.category LIKE :name", { name: `%${name}%` })
+                      .orWhere("service.description LIKE :name", { name: `%${name}%` })
+                      .orWhere("service.address LIKE :name", { name: `%${name}%` })
+                      .orWhere("professional.state LIKE :name", { name: `%${name}%` })
+                      .orWhere("professional.baseCity LIKE :name", { name: `%${name}%` })
+                      .orWhere("professional.currentAddress LIKE :name", { name: `%${name}%` });
+                }));
             }
 
             if (category) {
-                query.orWhere("service.category LIKE :category", { category: `%${category}%` });
+                query.andWhere("service.category LIKE :category", { category: `%${category}%` });
             }
 
             if (description) {
-                query.orWhere("service.description LIKE :description", { description: `%${description}%` });
+                query.andWhere("service.description LIKE :description", { description: `%${description}%` });
+            }
+
+            // Location state filter
+            if (state) {
+                query.andWhere("professional.state LIKE :state", { state: `%${state}%` });
+            }
+
+            // Availability filter
+            if (availability !== undefined) {
+                query.andWhere("professional.availability = :availability", { availability });
             }
 
             // Price range filter
@@ -357,10 +381,6 @@ export default class ProfessionalService extends Service {
 
             // Sorting by latest updated
             query.orderBy("service.updatedAt", "DESC");
-
-            query
-                .leftJoinAndSelect("service.professional", "professional")
-                .leftJoinAndSelect("professional.ratingAggregate", "rating");
 
             const [services, total] = await query.getManyAndCount();
 

@@ -80,6 +80,8 @@ export default class Package {
         const name = req.query.name as string | undefined;
         const category = req.query.category as string | undefined;
         const description = req.query.description as string | undefined;
+        const state = req.query.state as string | undefined;
+        const availability = req.query.availability !== undefined ? req.query.availability === 'true' : undefined;
 
         const minPrice = req.query.minPrice !== undefined ? parseFloat(req.query.minPrice as string) : undefined;
         const maxPrice = req.query.maxPrice !== undefined ? parseFloat(req.query.maxPrice as string) : undefined;
@@ -94,6 +96,8 @@ export default class Package {
             name,
             category,
             description,
+            state,
+            availability,
             minPrice,
             maxPrice,
             remote,

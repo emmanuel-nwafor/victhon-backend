@@ -124,6 +124,19 @@ export const validateServiceSearch = [
         .isUUID()
         .withMessage("professionalId must be a valid UUID"),
 
+    // state: optional string
+    query("state")
+        .optional()
+        .isString()
+        .withMessage("state must be a string"),
+
+    // availability: optional boolean
+    query("availability")
+        .optional()
+        .isBoolean()
+        .withMessage("availability must be true or false")
+        .toBoolean(),
+
     // limit: optional integer >= 1, default 10
     query("limit")
         .optional()
