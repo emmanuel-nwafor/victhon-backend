@@ -54,68 +54,8 @@ export default class Payment extends BaseService {
   }
 
   public async initializeCommitmentPayment(bookingId: string, userId: string) {
-    try {
-      const booking = await this.bookingRepo.findOne({
-        where: { id: bookingId, userId },
-        relations: ["user", "professional.wallet"],
-      });
-
-      if (!booking) return this.responseData(404, true, "Booking not found");
-      if (booking.isChatUnlocked) return this.responseData(400, true, "Chat is already unlocked for this booking");
-
-      const settings = await this.platformSettingsRepo.findOne({ where: {} });
-      const currentFee = Number(settings?.commitmentFee || 2000);
-
-      // If the fee in the booking is different from the current platform fee, update it
-      if (Number(booking.commitmentFee) !== currentFee) {
-        booking.commitmentFee = currentFee;
-        await this.bookingRepo.save(booking);
-      }
-
-      const amount = currentFee;
-      if (amount <= 0) return this.responseData(400, true, "Invalid commitment fee amount");
-
-      const tx_ref = `commitment_${booking.id}_${Date.now()}`;
-      const transaction = this.transactionRepo.create({
-        userId,
-        type: TransactionType.COMMITMENT_FEE,
-        amount,
-        status: TransactionStatus.PENDING,
-        reference: tx_ref,
-      });
-      await this.transactionRepo.save(transaction);
-
-      const response = await this.flwClient.post("/payments", {
-        tx_ref,
-        amount,
-        currency: "NGN",
-        redirect_url: this.FLW_REDIRECT_URL,
-        customer: {
-          email: booking.user.email,
-          name: `${booking.user.firstName} ${booking.user.lastName}`,
-        },
-        meta: {
-          type: TransactionType.COMMITMENT_FEE,
-          transactionId: transaction.id,
-          bookingId: booking.id,
-          userId,
-        },
-        customizations: {
-          title: "Booking Commitment Fee",
-          description: `Unlock chat for booking #${bookingId}`,
-        },
-      });
-
-      if (response.data?.status === "success") {
-        return this.responseData(200, false, "Commitment fee payment initiated", {
-          payment_link: response.data.data.link,
-          tx_ref,
-        });
-      }
-      return this.responseData(500, true, "Payment initialization failed");
-    } catch (error) {
-      return this.handleTypeormError(error);
-    }
+    // Escrow update: Full amount is paid upfront directly into escrow
+    return this.initializeBookingPayment(bookingId, userId);
   }
 
   public async initializeBookingPayment(bookingId: string, userId: string) {
@@ -191,10 +131,11 @@ export default class Payment extends BaseService {
           transactionId: transaction.id,
           userId,
           escrowId: booking.escrow.id,
+          bookingId: booking.id,
         },
         customizations: {
-          title: "Booking Payment",
-          description: `Payment for booking #${bookingId}`,
+          title: "Service Escrow Payment",
+          description: `Full payment for booking #${bookingId} held securely in Escrow`,
         },
       });
 
@@ -345,9 +286,12 @@ export default class Payment extends BaseService {
       if (!booking) return this.responseData(404, true, "Booking not found");
       if (booking.isChatUnlocked) return this.responseData(200, false, "Booking already unlocked", booking);
 
-      // Search for any successful commitment transaction for this booking
+      // Search for any successful transaction (booking deposit or commitment) for this booking
       const tx = await this.transactionRepo.createQueryBuilder("tx")
-        .where("tx.reference LIKE :ref", { ref: `commitment_${bookingId}%` })
+        .where("(tx.reference LIKE :refBooking OR tx.reference LIKE :refCommitment)", {
+            refBooking: `booking_${bookingId}%`,
+            refCommitment: `commitment_${bookingId}%`
+        })
         .andWhere("tx.status = :status", { status: TransactionStatus.SUCCESS })
         .getOne();
 
@@ -371,7 +315,10 @@ export default class Payment extends BaseService {
 
       // If not in our DB, we check with Flutterwave using the latest pending reference
       const pendingTx = await this.transactionRepo.createQueryBuilder("tx")
-        .where("tx.reference LIKE :ref", { ref: `commitment_${bookingId}%` })
+        .where("(tx.reference LIKE :refBooking OR tx.reference LIKE :refCommitment)", {
+            refBooking: `booking_${bookingId}%`,
+            refCommitment: `commitment_${bookingId}%`
+        })
         .orderBy("tx.createdAt", "DESC")
         .getOne();
 
@@ -519,7 +466,7 @@ export default class Payment extends BaseService {
         if (payment.type === TransactionType.BOOKING_DEPOSIT) {
             payment = await manager.findOne(Transaction, {
                 where: { id: payment.id },
-                relations: ["escrow", "escrow.booking", "escrow.booking.professional", "escrow.booking.professional.wallet"]
+                relations: ["escrow", "escrow.booking", "escrow.booking.user", "escrow.booking.professional", "escrow.booking.professional.wallet"]
             }) || payment;
         }
 
@@ -558,10 +505,14 @@ export default class Payment extends BaseService {
             { status: EscrowStatus.PAID },
           );
 
+          // Escrow update: Full payment unlocks chat and moves booking to PENDING awaiting pro acceptance/action
           await manager.update(
             Booking,
             { id: escrow.booking.id },
-            { status: BookingStatus.SCHEDULED },
+            { 
+              status: BookingStatus.PENDING,
+              isChatUnlocked: true,
+            },
           );
 
           const wallet = await manager.findOne(Wallet, {
@@ -583,6 +534,30 @@ export default class Payment extends BaseService {
               totalBalance: newTotalBalance,
             },
           );
+
+          // Notify professional of new booking paid into Escrow
+          const customerName = `${escrow.booking.user?.firstName || ''} ${escrow.booking.user?.lastName || ''}`.trim() || 'A customer';
+          notify({
+              userId: escrow.booking.professionalId,
+              userType: UserType.PROFESSIONAL,
+              type: NotificationType.BOOKING,
+              data: { 
+                  ...escrow.booking, 
+                  professional: undefined,
+                  body: `${customerName} paid ₦${grossAmount.toLocaleString()} into Escrow and booked your service`
+              },
+          }).catch(err => logger.error(`[PAYMENT_WEBHOOK] Notification error: ${err.message}`));
+
+          // Notify customer of escrow security confirmation
+          notify({
+              userId: escrow.booking.userId,
+              userType: UserType.USER,
+              type: NotificationType.BOOKING_PAYMENT,
+              data: { 
+                  ...escrow.booking, 
+                  body: `Your payment of ₦${grossAmount.toLocaleString()} is securely held in Escrow. Chat is now unlocked!`
+              },
+          }).catch(err => logger.error(`[PAYMENT_WEBHOOK] Customer notification error: ${err.message}`));
 
           eventToPublish = {
             queueName: QueueNames.PAYMENT,

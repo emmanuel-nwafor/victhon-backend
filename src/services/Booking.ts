@@ -148,10 +148,8 @@ export default class BookingService extends Service {
                     totalPrice += Number(items.price);
                 }
 
-                // Fetch platform settings for commitment fee
-                const settingsRepo = manager.getRepository(PlatformSetting);
-                const settings = await settingsRepo.findOne({ where: {} });
-                const commitmentFee = settings ? Number(settings.commitmentFee) : 2000;
+                // Full payment will be deposited into escrow upfront (no separate commitment fee)
+                const commitmentFee = 0;
 
                 // --- Step 4: Create booking ---
                 const booking = manager.create(Booking, {

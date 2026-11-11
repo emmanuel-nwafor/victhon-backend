@@ -16,6 +16,7 @@ import { Inbox } from "./jobs/Inbox";
 import logger from "./config/logger";
 import { Admin } from "./entities/Admin";
 import Password from "./utils/Password";
+import PromotionalNotificationService from "./services/PromotionalNotificationService";
 
 const PORT = env(EnvKey.PORT)!;
 
@@ -53,14 +54,14 @@ const PORT = env(EnvKey.PORT)!;
         // const pubClient: RedisClientType = createClient({ url: env(EnvKey.REDIS_URL)! });
         const pubClient: RedisClientType = createClient({
             url: env(EnvKey.REDIS_URL)!,  // e.g., rediss://...
-            socket: { reconnectStrategy: retries => Math.min(retries * 50, 500) }  // Exponential backoff
+            socket: { reconnectStrategy: (retries: number) => Math.min(retries * 50, 500) }  // Exponential backoff
         });
-        pubClient.on("error", (err) => {
+        pubClient.on("error", (err: any) => {
             logger.error('Redis pubClient connection error:', err);
         });
 
         const subClient: RedisClientType = pubClient.duplicate();
-        subClient.on("error", (err) => {
+        subClient.on("error", (err: any) => {
             logger.error('Redis subClient connection error:', err);
         });
         await Promise.all([pubClient.connect(), subClient.connect()]);
@@ -220,5 +221,37 @@ cron.schedule('0 * * * *', async () => {
         console.error('Auto-refund cron failed', err);
     } finally {
         isAutoRefundRunning = false;
+    }
+});
+
+let isPromoRunning = false;
+// Run every Monday at 10:00 AM to send re-engagement emails & push notifications to inactive users
+cron.schedule('0 10 * * 1', async () => {
+    if (isPromoRunning) return;
+    isPromoRunning = true;
+    try {
+        logger.info('⏰ Running inactive user re-engagement campaign...');
+        const promoService = new PromotionalNotificationService();
+        await promoService.sendInactiveUserReminders(7);
+    } catch (err) {
+        logger.error('Inactive user re-engagement cron failed', err);
+    } finally {
+        isPromoRunning = false;
+    }
+});
+
+let isDiscoveryRunning = false;
+// Run every Thursday at 12:00 PM to send nearby provider discovery push notifications
+cron.schedule('0 12 * * 4', async () => {
+    if (isDiscoveryRunning) return;
+    isDiscoveryRunning = true;
+    try {
+        logger.info('⏰ Running discover nearby providers push campaign...');
+        const promoService = new PromotionalNotificationService();
+        await promoService.sendDiscoverNearbyProviders();
+    } catch (err) {
+        logger.error('Discover nearby providers cron failed', err);
+    } finally {
+        isDiscoveryRunning = false;
     }
 });

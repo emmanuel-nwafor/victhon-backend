@@ -377,4 +377,30 @@ export default class Email {
     `;
     return this.sendEmail(email, `New message from ${senderName} — Victhon`, html, "New Message");
   }
+
+  // ─── Re-engagement / Miss You Email ──────────────────────────────────────────
+
+  public async sendMissYouEmail(email: string, firstName?: string) {
+    const greetingName = firstName ? ` ${firstName}` : "";
+    const html = `
+      <h2 style="margin: 0 0 16px; font-size: 24px; color: #0f172a; font-weight: 800;">It's been a while${greetingName}! 👋</h2>
+      <p style="margin: 0 0 20px; font-size: 16px; color: #475569; line-height: 1.6;">
+        We noticed you haven't stopped by Victhon recently. Whenever you need quality repairs, plumbing, electrical installations, painting, or professional home services, trusted pros are ready near you.
+      </p>
+      
+      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+        <h3 style="margin: 0 0 8px; font-size: 16px; color: ${this.BRAND_GREEN}; font-weight: 700;">🛡️ Always Protected by Escrow</h3>
+        <p style="margin: 0; font-size: 14px; color: #166534; line-height: 1.5;">
+          Every booking is 100% secured in Escrow. Your payment is held safely and only released when the service is completed to your satisfaction.
+        </p>
+      </div>
+
+      <p style="margin: 0 0 28px; font-size: 15px; color: #64748b; line-height: 1.6;">
+        Discover verified service providers ready to help you today.
+      </p>
+
+      <a href="https://victhon.co" style="display: block; text-align: center; padding: 18px; background-color: ${this.BRAND_GREEN}; color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 16px;">Explore Nearby Services</a>
+    `;
+    return this.sendEmail(email, "It's been a while, Victhon misses you! 👋", html, "We Miss You!");
+  }
 }
