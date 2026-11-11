@@ -1064,10 +1064,18 @@ export default class Payment extends BaseService {
 
   public async resolveAccount(accountNumber: string, bankCode: string) {
     try {
-      const cleanAccountNumber = String(accountNumber || "").replace(/[^0-9]/g, '');
-      const cleanBankCode = String(bankCode || "").replace(/[^0-9]/g, '');
+      const cleanAccountNumber = String(accountNumber || "").replace(/[^0-9]/g, '').trim();
+      const cleanBankCode = String(bankCode || "").replace(/[^0-9]/g, '').trim();
 
-      logger.info(`🔍 Flutterwave Resolve: "${cleanAccountNumber}" at bank code "${cleanBankCode}"`);
+      if (!cleanAccountNumber || cleanAccountNumber.length !== 10) {
+        return this.responseData(400, true, "Account number must be exactly 10 digits");
+      }
+
+      if (!cleanBankCode) {
+        return this.responseData(400, true, "Bank selection is required");
+      }
+
+      logger.info(`🔍 Flutterwave Resolve: Account="${cleanAccountNumber}" at bank code "${cleanBankCode}"`);
 
       const response = await this.flwClient.post("/accounts/resolve", {
         account_number: cleanAccountNumber,
@@ -1079,13 +1087,22 @@ export default class Payment extends BaseService {
       logger.error("Flutterwave API failed", flwError);
 
       const errorMessage = typeof flwError === 'object' ? flwError.message : String(flwError);
+      const lower = errorMessage?.toLowerCase() || "";
 
-      if (errorMessage?.toLowerCase().includes('only 044 is allowed')) {
+      if (lower.includes('only 044 is allowed')) {
         return this.responseData(400, true, "Flutterwave Test Mode only supports Access Bank (code: 044). Please verify you are using a correct Access Bank account.");
       }
 
-      if (errorMessage?.toLowerCase().includes('must be numberic')) {
+      if (lower.includes('must be numberic')) {
         return this.responseData(400, true, `Flutterwave requires numeric account details. Got: Account=${accountNumber}, Bank=${bankCode}`);
+      }
+
+      if (lower.includes('invalid account')) {
+        return this.responseData(400, true, "Invalid account number. Please check your account number and ensure the correct bank is selected.");
+      }
+
+      if (lower.includes('unknown bank')) {
+        return this.responseData(400, true, "Selected bank code is not recognized by the payment provider. Please re-select your bank from the list.");
       }
 
       return this.responseData(400, true, "Could not verify account details. " + (errorMessage || ""));
