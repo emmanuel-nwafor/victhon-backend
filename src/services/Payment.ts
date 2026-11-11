@@ -985,11 +985,47 @@ export default class Payment extends BaseService {
       }
 
       case "transfer.completed": {
-        if (data.status === "SUCCESSFUL") {
-          logger.info(`Transfer successful — reference: ${data.reference}`);
-        } else {
-          logger.warn(`Transfer failed — reference: ${data.reference}`);
-        }
+        const reference = data?.reference;
+        const transferStatus = String(data?.status || "").toUpperCase();
+        if (!reference) break;
+
+        await AppDataSource.transaction(async (manager) => {
+          const tx = await manager.findOne(Transaction, {
+            where: { reference, type: TransactionType.WITHDRAWAL },
+            relations: ["wallet"],
+          });
+
+          if (!tx) {
+            logger.warn(`[TRANSFER_WEBHOOK] Transaction not found for reference: ${reference}`);
+            return;
+          }
+
+          if (tx.status === TransactionStatus.SUCCESS || tx.status === TransactionStatus.FAILED) {
+            logger.info(`[TRANSFER_WEBHOOK] Transaction ${reference} already finalized (${tx.status}).`);
+            return;
+          }
+
+          if (transferStatus === "SUCCESSFUL") {
+            tx.status = TransactionStatus.SUCCESS;
+            await manager.save(tx);
+            logger.info(`Transfer successful — reference: ${reference}`);
+          } else {
+            if (tx.wallet?.id) {
+              const lockedWallet = await manager.findOne(Wallet, {
+                where: { id: tx.wallet.id },
+                lock: { mode: "pessimistic_write" },
+              });
+              if (lockedWallet) {
+                lockedWallet.balance = Number(lockedWallet.balance) + Number(tx.amount);
+                lockedWallet.totalBalance = Number(lockedWallet.balance) + Number(lockedWallet.pendingAmount);
+                await manager.save(lockedWallet);
+              }
+            }
+            tx.status = TransactionStatus.FAILED;
+            await manager.save(tx);
+            logger.warn(`Transfer failed & refunded — reference: ${reference}, status: ${transferStatus}`);
+          }
+        });
         break;
       }
 
@@ -1124,7 +1160,7 @@ export default class Payment extends BaseService {
       });
       if (!wallet) return this.responseData(404, true, "Wallet not found");
 
-      if (wallet.balance < amount)
+      if (Number(wallet.balance) < amount)
         return this.responseData(400, true, "Insufficient balance");
       if (amount < 100)
         return this.responseData(400, true, "Amount too low for withdrawal");
@@ -1184,7 +1220,7 @@ export default class Payment extends BaseService {
           lock: { mode: "pessimistic_write" },
         });
 
-        if (!lockedWallet || lockedWallet.balance < amount) {
+        if (!lockedWallet || Number(lockedWallet.balance) < amount) {
           throw new Error("Insufficient balance during processing");
         }
 

@@ -73,7 +73,7 @@ export default class Payment {
 
     public static async withdraw(req: Request, res: Response) {
         const { id: userId } = res.locals.data;
-        const { accountId, amount, pin, bankCode, accountNumber, accountName } = req.body;
+        const { accountId, amount, pin, bankCode, bankName, accountNumber, accountName } = req.body;
         const parsedAmount = parseFloat(amount) || null;
 
         if (!parsedAmount) {
@@ -81,7 +81,9 @@ export default class Payment {
             return;
         }
 
-        const accountDetails = (bankCode && accountNumber) ? { bankCode, accountNumber, accountName } : undefined;
+        const accountDetails = (bankCode && accountNumber)
+            ? { bankCode, bankName, accountNumber, accountName }
+            : undefined;
         const serviceResult = await Payment.service.withdraw(userId, accountId, parsedAmount, pin, accountDetails);
         Controller.response(res, serviceResult);
     }
