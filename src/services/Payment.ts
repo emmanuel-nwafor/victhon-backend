@@ -88,18 +88,6 @@ export default class Payment extends BaseService {
         );
       }
 
-      const existingTx = await this.transactionRepo.findOne({
-        where: {
-          escrowId: booking.escrow.id,
-          type: TransactionType.BOOKING_DEPOSIT,
-          status: TransactionStatus.PENDING,
-        },
-      });
-
-      if (existingTx) {
-        await this.transactionRepo.delete(existingTx.id);
-      }
-
       const tx_ref = `booking_${booking.id}_${Date.now()}`;
 
       // Calculate balance to pay - Fixed: commitment fee is now additional, not subtracted
@@ -163,22 +151,26 @@ export default class Payment extends BaseService {
     }
   }
 
-  public async verifyFlwTransaction(flwTransactionId: string | number) {
+  public async verifyFlwTransaction(flwTransactionIdOrRef: string | number) {
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000;
+    const trimmed = String(flwTransactionIdOrRef ?? "").trim();
+    const isNumericId = /^\d+$/.test(trimmed);
+    const verifyUrl = isNumericId
+      ? `/transactions/${trimmed}/verify`
+      : `/transactions/verify_by_reference?tx_ref=${encodeURIComponent(trimmed)}`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const response = await this.flwClient.get(
-          `/transactions/${flwTransactionId}/verify`,
-        );
+        const response = await this.flwClient.get(verifyUrl);
         const data = response.data?.data;
 
         // Normalize status to same shape the rest of the codebase expects
+        const flwStatus = String(data?.status || "").toLowerCase();
         const status =
-          data?.status === "successful"
+          flwStatus === "successful"
             ? "success"
-            : data?.status === "failed"
+            : flwStatus === "failed"
               ? "failed"
               : "pending";
 
@@ -191,7 +183,21 @@ export default class Payment extends BaseService {
           metadata: data?.meta ?? {},
           raw: data,
         };
-      } catch (error) {
+      } catch (error: any) {
+        const httpStatus = error?.response?.status;
+        // 400/404 from Flutterwave means transaction is not found/not yet settled, not a transient failure
+        if (httpStatus === 400 || httpStatus === 404) {
+          return {
+            status: "pending",
+            tx_ref: isNumericId ? undefined : trimmed,
+            flw_ref: undefined,
+            amount: 0,
+            currency: "NGN",
+            metadata: {},
+            raw: null,
+          };
+        }
+
         console.error(`Attempt ${attempt} failed:`, error);
         if (attempt === MAX_RETRIES) {
           throw new Error(
@@ -208,15 +214,18 @@ export default class Payment extends BaseService {
     };
   }
 
-  public async verifyFlwTransactionService(flwTransactionId: string) {
+  public async verifyFlwTransactionService(flwTransactionIdOrRef: string) {
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000;
+    const trimmed = String(flwTransactionIdOrRef ?? "").trim();
+    const isNumericId = /^\d+$/.test(trimmed);
+    const verifyUrl = isNumericId
+      ? `/transactions/${trimmed}/verify`
+      : `/transactions/verify_by_reference?tx_ref=${encodeURIComponent(trimmed)}`;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const response = await this.flwClient.get(
-          `/transactions/${flwTransactionId}/verify`,
-        );
+        const response = await this.flwClient.get(verifyUrl);
 
         const data = response.data?.data;
 
@@ -227,21 +236,24 @@ export default class Payment extends BaseService {
             "Transaction not found on Flutterwave",
           );
 
-        const isSuccessful = data.status === "successful";
+        const flwStatus = String(data.status || "").toLowerCase();
+        const isSuccessful = flwStatus === "successful";
+        const isFailed = flwStatus === "failed";
 
           if (data.tx_ref) {
-            // Save flwTransactionId on transaction record first
-            await this.transactionRepo.update(
-              { reference: data.tx_ref },
-              { flwTransactionId: String(flwTransactionId) }
-            );
+            const resolvedFlwId = data.id ? String(data.id) : (isNumericId ? trimmed : undefined);
+            if (resolvedFlwId) {
+              await this.transactionRepo.update(
+                { reference: data.tx_ref },
+                { flwTransactionId: resolvedFlwId }
+              );
+            }
 
             // If successful, process all charge side effects (wallet, escrow, chat unlocking)
             // successfulCharge will handle the status update to SUCCESS
             if (isSuccessful) {
               await this.successfulCharge(data);
-            } else {
-              // If failed, we still mark it as failed here
+            } else if (isFailed) {
               await this.transactionRepo.update(
                 { reference: data.tx_ref },
                 { status: TransactionStatus.FAILED }
@@ -258,7 +270,7 @@ export default class Payment extends BaseService {
       } catch (error: any) {
         console.error(`Attempt ${attempt} failed:`, error);
 
-        if (attempt === MAX_RETRIES) {
+        if (attempt === MAX_RETRIES || error?.response?.status === 400 || error?.response?.status === 404) {
           const flwMessage = error?.response?.data?.message;
           if (flwMessage) {
             return this.responseData(400, true, flwMessage);
@@ -319,27 +331,43 @@ export default class Payment extends BaseService {
           return this.responseData(200, false, "Booking verified and funds held in Escrow", booking);
       }
 
-      // If not in our DB, we check with Flutterwave using the latest pending reference
-      const pendingTx = await this.transactionRepo.createQueryBuilder("tx")
+      // Check recent transactions (not yet SUCCESS) with Flutterwave using flwTransactionId or tx_ref
+      const candidateTxs = await this.transactionRepo.createQueryBuilder("tx")
         .where("(tx.reference LIKE :refBooking OR tx.reference LIKE :refCommitment)", {
             refBooking: `booking_${bookingId}%`,
             refCommitment: `commitment_${bookingId}%`
         })
         .orderBy("tx.createdAt", "DESC")
-        .getOne();
+        .take(5)
+        .getMany();
 
-      if (!pendingTx) return this.responseData(404, true, "No payment records found for this booking");
-
-      const flwResponse = await this.verifyFlwTransaction(pendingTx.reference);
-      
-      if (flwResponse.status === "success") {
-          logger.info(`[MANUAL_VERIFY] Flutterwave confirmed success for ${pendingTx.reference}. Processing...`);
-          await this.successfulCharge(flwResponse);
-          const updatedBooking = await this.bookingRepo.findOne({ where: { id: bookingId }, relations: ["escrow"] });
-          return this.responseData(200, false, "Booking verified and funds held in Escrow", updatedBooking);
+      if (candidateTxs.length === 0) {
+        return this.responseData(404, true, "No payment records found for this booking");
       }
 
-      return this.responseData(400, true, "Payment not yet confirmed by Flutterwave", { flwStatus: flwResponse.status });
+      let lastStatus = "pending";
+      for (const pendingTx of candidateTxs) {
+        const lookupKey = pendingTx.flwTransactionId || pendingTx.reference;
+        if (!lookupKey) continue;
+
+        const flwResponse = await this.verifyFlwTransaction(lookupKey);
+        lastStatus = flwResponse.status;
+
+        if (flwResponse.status === "success") {
+          logger.info(`[MANUAL_VERIFY] Flutterwave confirmed success for ${pendingTx.reference}. Processing...`);
+          if (flwResponse.raw?.id && !pendingTx.flwTransactionId) {
+            await this.transactionRepo.update(
+              { id: pendingTx.id },
+              { flwTransactionId: String(flwResponse.raw.id) },
+            );
+          }
+          await this.successfulCharge(flwResponse.raw || flwResponse);
+          const updatedBooking = await this.bookingRepo.findOne({ where: { id: bookingId }, relations: ["escrow"] });
+          return this.responseData(200, false, "Booking verified and funds held in Escrow", updatedBooking);
+        }
+      }
+
+      return this.responseData(400, true, "Payment not yet confirmed by Flutterwave", { flwStatus: lastStatus });
     } catch (error) {
       logger.error(`[MANUAL_VERIFY] Error verifying escrow payment for ${bookingId}:`, error);
       return this.handleTypeormError(error);
@@ -385,15 +413,16 @@ export default class Payment extends BaseService {
 
       for (const tx of transactions) {
         try {
-          if (!tx.flwTransactionId) {
+          const lookupKey = tx.flwTransactionId || tx.reference;
+          if (!lookupKey) {
             await this.failTransaction(
               tx.id,
-              "Missing Flutterwave transaction ID",
+              "Missing Flutterwave transaction identifier",
             );
             continue;
           }
 
-          const flwTx = await this.verifyFlwTransaction(tx.flwTransactionId);
+          const flwTx = await this.verifyFlwTransaction(lookupKey);
 
           if (flwTx.status === "success") {
             await RabbitMQ.publishToExchange(
@@ -401,7 +430,7 @@ export default class Payment extends BaseService {
               QueueEvents.PAYMENT_CHARGE_SUCCESSFUL,
               {
                 eventType: QueueEvents.PAYMENT_CHARGE_SUCCESSFUL,
-                payload: { data: flwTx },
+                payload: { data: flwTx.raw || flwTx },
               },
             );
           } else if (flwTx.status === "failed") {
