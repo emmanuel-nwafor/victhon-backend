@@ -280,13 +280,15 @@ export default class Payment extends BaseService {
     try {
       const booking = await this.bookingRepo.findOne({
         where: { id: bookingId },
-        relations: ["user", "professional"]
+        relations: ["user", "professional", "escrow"]
       });
 
       if (!booking) return this.responseData(404, true, "Booking not found");
-      if (booking.isChatUnlocked) return this.responseData(200, false, "Booking already unlocked", booking);
+      if (booking.isChatUnlocked && booking.escrow?.status === EscrowStatus.PAID) {
+        return this.responseData(200, false, "Booking already verified and funds held in Escrow", booking);
+      }
 
-      // Search for any successful transaction (booking deposit or commitment) for this booking
+      // Search for any successful transaction for this booking
       const tx = await this.transactionRepo.createQueryBuilder("tx")
         .where("(tx.reference LIKE :refBooking OR tx.reference LIKE :refCommitment)", {
             refBooking: `booking_${bookingId}%`,
@@ -299,6 +301,10 @@ export default class Payment extends BaseService {
           logger.info(`[MANUAL_VERIFY] Found successful transaction ${tx.id} in DB. Unlocking booking ${bookingId}.`);
           booking.isChatUnlocked = true;
           booking.status = BookingStatus.PENDING;
+          if (booking.escrow) {
+              booking.escrow.status = EscrowStatus.PAID;
+              await this.escrowRepo.save(booking.escrow);
+          }
           await this.bookingRepo.save(booking);
           
           await RabbitMQ.publishToExchange(QueueNames.PAYMENT, QueueEvents.PAYMENT_COMMITMENT_SUCCESSFUL, {
@@ -310,7 +316,7 @@ export default class Payment extends BaseService {
               }
           });
           
-          return this.responseData(200, false, "Booking unlocked successfully", booking);
+          return this.responseData(200, false, "Booking verified and funds held in Escrow", booking);
       }
 
       // If not in our DB, we check with Flutterwave using the latest pending reference
@@ -329,13 +335,13 @@ export default class Payment extends BaseService {
       if (flwResponse.status === "success") {
           logger.info(`[MANUAL_VERIFY] Flutterwave confirmed success for ${pendingTx.reference}. Processing...`);
           await this.successfulCharge(flwResponse);
-          const updatedBooking = await this.bookingRepo.findOne({ where: { id: bookingId } });
-          return this.responseData(200, false, "Booking verified and unlocked", updatedBooking);
+          const updatedBooking = await this.bookingRepo.findOne({ where: { id: bookingId }, relations: ["escrow"] });
+          return this.responseData(200, false, "Booking verified and funds held in Escrow", updatedBooking);
       }
 
       return this.responseData(400, true, "Payment not yet confirmed by Flutterwave", { flwStatus: flwResponse.status });
     } catch (error) {
-      logger.error(`[MANUAL_VERIFY] Error verifying commitment for ${bookingId}:`, error);
+      logger.error(`[MANUAL_VERIFY] Error verifying escrow payment for ${bookingId}:`, error);
       return this.handleTypeormError(error);
     }
   }

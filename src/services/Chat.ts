@@ -12,6 +12,7 @@ import { FailedFiles, UploadedFiles } from "../types";
 import MessageAttachment from "../entities/MessageAttachment";
 import { RabbitMQ } from "./RabbitMQ";
 import { Booking, BookingStatus } from "../entities/Booking";
+import { EscrowStatus } from "../entities/Escrow";
 
 
 class TransactionError extends Error {
@@ -205,18 +206,17 @@ export default class Chat extends Service {
                 const user = await manager.findOne(User, { where: { id: userId } });
                 if (!user) throw new TransactionError("User not found");
 
-                // --- NEW RESTRICTION ---
-                // Check if there is at least one booking between them that is unlocked
+                // Check if there is at least one booking between them where chat is unlocked or escrow has been paid
                 const unlockedBooking = await manager.findOne(Booking, {
-                    where: {
-                        userId,
-                        professionalId,
-                        isChatUnlocked: true
-                    }
+                    where: [
+                        { userId, professionalId, isChatUnlocked: true },
+                        { userId, professionalId, escrow: { status: EscrowStatus.PAID } },
+                    ],
+                    relations: ["escrow"],
                 });
 
                 if (!unlockedBooking) {
-                    throw new TransactionError("Chat is locked. Please pay the commitment fee for your booking to unlock chat.");
+                    throw new TransactionError("Chat is locked. Please complete your service payment to hold funds securely in Escrow and unlock chat.");
                 }
                 // -----------------------
                 // const chatExists = await manager.findOne(ChatParticipant, {

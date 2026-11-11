@@ -148,14 +148,14 @@ export default class BookingService extends Service {
                     totalPrice += Number(items.price);
                 }
 
-                // Full payment will be deposited into escrow upfront (no separate commitment fee)
+                // Full payment will be deposited into escrow upfront
                 const commitmentFee = 0;
 
                 // --- Step 4: Create booking ---
                 const booking = manager.create(Booking, {
                     userId,
                     professionalId,
-                    status: BookingStatus.AWAITING_COMMITMENT,
+                    status: BookingStatus.PENDING,
                     startDateTime,
                     endDateTime,
                     // location,
@@ -343,7 +343,7 @@ export default class BookingService extends Service {
             }
 
             if (!booking.isChatUnlocked) {
-                booking.address = "Hidden until commitment fee is paid";
+                booking.address = "Hidden until payment is held in Escrow";
             }
 
             return this.responseData(
@@ -404,11 +404,15 @@ export default class BookingService extends Service {
                     id: bookingId,
                     professionalId: proId,
                 },
-                relations: ["professional", "user"],
+                relations: ["professional", "user", "escrow"],
             });
 
             if (!booking)
                 return this.responseData(404, true, "Booking was not found");
+
+            if (booking.escrow?.status !== EscrowStatus.PAID) {
+                return this.responseData(400, true, "Cannot accept this booking until the customer completes payment into Escrow.");
+            }
 
             if (booking.status !== BookingStatus.PENDING) {
                 return this.responseData(400, true, `This booking is already ${booking.status.replace('_', ' ')}.`);
@@ -862,7 +866,7 @@ export default class BookingService extends Service {
                 });
 
                 if (!booking) throw new Error("Booking not found");
-                if (![BookingStatus.CHATTING, BookingStatus.AWAITING_COMMITMENT, BookingStatus.ACCEPTED].includes(booking.status)) {
+                if (![BookingStatus.PENDING, BookingStatus.CHATTING, BookingStatus.ACCEPTED].includes(booking.status)) {
                     throw new Error("Cannot adjust price at this stage");
                 }
 
